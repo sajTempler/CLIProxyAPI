@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Claude Code routed through the local CLIProxyAPI (127.0.0.1:8317).
+# Plain `claude` stays direct so claude.ai connectors keep working.
+# Cursor models: claudep --model cursor/<id>. Claude Code assumes a 200k window for them;
+# for 1M variants use --model 'cursor/<id>[1m]', for other sizes set
+# CLAUDE_CODE_MAX_CONTEXT_TOKENS=<n> (see ~/private/CLIProxyAPI/docs/cursor/USAGE.md).
+set -euo pipefail
+env_file="$HOME/private/CLIProxyAPI/.env"
+key="$(sed -n 's/^CPA_API_KEY=//p' "$env_file")"
+[ -n "$key" ] || { echo "claudep: CPA_API_KEY missing in $env_file" >&2; exit 1; }
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"
+export ANTHROPIC_AUTH_TOKEN="$key"
+exec claude "$@"
