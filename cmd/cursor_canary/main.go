@@ -13,7 +13,12 @@
 // The proxy key is CPA_API_KEY from the environment, else from --env-file. It
 // is sent as a Bearer token (like claudep) and never printed.
 //
-// Exit codes: 0 ok, 1 protocol broken, 2 auth expired, 3 cursor provider not
+// Each run uses a fresh X-Claude-Code-Session-Id, as Claude Code does, so turn
+// 2 continues the Run held open by turn 1. After a passing round-trip the
+// canary reads the `expired` field (and nothing else) of the cursor auth files
+// in --auth-dir and exits 2 when a login expires within 7 days.
+//
+// Exit codes: 0 ok, 1 protocol broken, 2 auth expired or expiring, 3 cursor provider not
 // registered (expected until the provider lands; must not alert), 4
 // inconclusive (proxy down, key missing or rejected, rate limited).
 //
@@ -25,6 +30,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -57,6 +63,7 @@ func run(args []string, getenv func(string) string) Result {
 	envFile := fs.String("env-file", ".env", "file with CPA_API_KEY when it is not in the environment")
 	model := fs.String("model", "", "cursor model id (default: cheapest offered)")
 	timeout := fs.Duration("timeout", 3*time.Minute, "overall deadline")
+	authDir := fs.String("auth-dir", firstNonEmpty(getenv("CURSOR_CANARY_AUTH_DIR"), defaultAuthDir()), "proxy auth directory (cursor-*.json expiry check)")
 	if err := fs.Parse(args); err != nil {
 		return fail(ExitInconclusive, "bad flags: %v", err)
 	}
@@ -70,14 +77,34 @@ func run(args []string, getenv func(string) string) Result {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
-	c := &canary{baseURL: strings.TrimRight(*baseURL, "/"), key: key, client: http.DefaultClient}
-	return c.Run(ctx, *model)
+	c := &canary{baseURL: strings.TrimRight(*baseURL, "/"), key: key, client: http.DefaultClient, sessionID: newSessionID()}
+	res := c.Run(ctx, *model)
+	if res.Code != ExitOK {
+		return res
+	}
+	if exp := checkAuthExpiry(expandHome(*authDir), time.Now()); exp.Code != ExitOK {
+		exp.Reason += " (round-trip ok: " + res.Reason + ")"
+		return exp
+	}
+	return res
+}
+
+// newSessionID returns a random UUID-shaped Claude Code session id.
+func newSessionID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("canary-%d", time.Now().UnixNano())
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 type canary struct {
-	baseURL string
-	key     string
-	client  *http.Client
+	baseURL   string
+	key       string
+	client    *http.Client
+	sessionID string // X-Claude-Code-Session-Id; empty sends none
 }
 
 // Run executes the canary and returns its verdict.
@@ -184,6 +211,9 @@ func (c *canary) headers(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.key)
 	req.Header.Set("anthropic-version", "2023-06-01")
 	req.Header.Set("User-Agent", "cursor-canary")
+	if c.sessionID != "" {
+		req.Header.Set("X-Claude-Code-Session-Id", c.sessionID)
+	}
 }
 
 // readEnvKey returns KEY's value from a dotenv file without logging it.
