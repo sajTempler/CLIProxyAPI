@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs when the Cursor agent CLI installs a new version: cursor_proto_sync check, then the canary.
+  Install (after review):
+    cp scripts/cursor/com.szymon.cursor-agent-watch.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.szymon.cursor-agent-watch.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.szymon.cursor-agent-watch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/szymon/private/CLIProxyAPI/scripts/cursor/maintenance.sh</string>
+    <string>watch</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/szymon/private/CLIProxyAPI</string>
+  <key>WatchPaths</key>
+  <array>
+    <string>/Users/szymon/.local/share/cursor-agent/versions</string>
+  </array>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>ThrottleInterval</key>
+  <integer>300</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/szymon/private/CLIProxyAPI/logs/cursor-maintenance.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/szymon/private/CLIProxyAPI/logs/cursor-maintenance.launchd.log</string>
+</dict>
+</plist>
