@@ -44,3 +44,8 @@ date, phase, what changed (commit SHAs), what's next, blockers. Newest at the bo
   - Wiring: `sdk/cliproxy/service_claude_quota.go` (new); one-line hooks in `service_config.go` (state fields, strategy case, tracker attach) and `builder.go` (tracker created before the manager); management `normalizeRoutingStrategy` falls through to `config.NormalizeSoonestResetStrategy`.
   - Tests: ordering/fallback keys, 5h threshold + rejected, weekly 100 %, Fable-only skip, unknown + `RequestPoll`, all-skipped, expiry with fake clock, tie window + each tie-break, mixed non-Claude, cooldown filter + `modelCooldownError`, config interval/threshold/round-trip, alias normalize. Green.
   - Next: phase 3 (affinity composition).
+- 2026-10-21 (phase 3, commit "test(quota-routing): prove soonest-reset composes with session affinity"):
+  - Tests only, no production change. `sdk/cliproxy/auth/selector_soonest_reset_affinity_test.go` (SelectAuth + MarkResult) and `test/claude_quota_routing_test.go` (Manager.Execute with a fake Claude executor whose responses carry unified headers, so ordering is fed passively).
+  - Proven: cold session binds rank 1; rank change keeps bound session, new session takes new rank 1; tracked 5h=100 % does not move a bound session; 429 + unified 5h `rejected` headers cools the account, the tracker records `rejected`, the session rebinds to the next rank; 5xx keeps the binding under `rebind-on: quota` (verified the same test fails with `rebind-on: any`).
+  - Test clocks: tracker clock frozen at the real start time, manual observations stamped before it (MarkResult stamps header observations with the wall clock). No sleeps.
+  - Next: phase 4 (usage poller).
