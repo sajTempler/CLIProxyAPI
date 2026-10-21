@@ -562,3 +562,44 @@ func TestCursorStreamThinkingCarriesNoSignature(t *testing.T) {
 		t.Fatal("fixture produced no thinking to check")
 	}
 }
+
+// New user text while a Run is held for a tool result, with no tool_result in
+// the request (a rewound turn): the held Run gets a cancel_action and is
+// closed, and the new text starts a Run on the stored checkpoint. Checked
+// live in Phase 6 (STATUS.md).
+func TestCursorStreamNewTextWhileRunHeldCancelsIt(t *testing.T) {
+	rt := loadCursorFixtures(t, "tool-roundtrip-1", "tool-roundtrip-2")
+	c := newCursorTestClient(rt)
+	conv := &cursorTestConversation{System: cursorTestSystem, Tools: cursorTestTools}
+	conv.user("Use the lookup_secret tool to get the secret for key 'alpha' and tell me the value.")
+	a := streamCursor(t, c, "conv", "composer-2.5", conv)
+	if a.StopReason != cursorStopToolUse {
+		t.Fatalf("first response stop = %q", a.StopReason)
+	}
+	conv.Messages = append(conv.Messages, map[string]any{"role": "assistant", "content": []map[string]any{{"type": "text", "text": "Let me check."}}})
+	conv.user("Thanks. Now say the value backwards, no tools.")
+	streamCursor(t, c, "conv", "composer-2.5", conv)
+
+	if rt.opened() != 2 {
+		t.Fatalf("runs opened = %d, want 2", rt.opened())
+	}
+	var cancelled bool
+	for _, m := range rt.conn(0).sentMessages() {
+		cancelled = cancelled || m.GetConversationAction().GetCancelAction() != nil
+	}
+	if !cancelled || !rt.conn(0).isClosed() {
+		t.Fatalf("held Run: cancel sent %v, closed %v", cancelled, rt.conn(0).isClosed())
+	}
+	if len(rt.conn(0).mcpResults()) != 0 {
+		t.Fatal("the cancelled call must not be answered")
+	}
+	run2 := rt.conn(1).sentMessages()[0].GetRunRequest()
+	if got := run2.GetAction().GetUserMessageAction().GetUserMessage().GetText(); got != "Thanks. Now say the value backwards, no tools." {
+		t.Fatalf("new Run text = %q (want the plain new text on the checkpoint, not a transcript)", got)
+	}
+	// Same conversation id: the checkpoint path kept the state (a transcript
+	// fallback would have reset it).
+	if run1 := rt.conn(0).sentMessages()[0].GetRunRequest(); run2.GetConversationId() != run1.GetConversationId() {
+		t.Fatalf("conversation id changed: %s -> %s", run1.GetConversationId(), run2.GetConversationId())
+	}
+}

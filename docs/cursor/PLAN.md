@@ -1,6 +1,6 @@
 # Plan: `cursor` upstream provider (native, Track A)
 
-Status: Phases 0-4 landed and deployed (2026-10-21): `cursor/*` models serve Claude Code with real tool use. Next: Phase 5 (management + TUI) / Phase 6 (Claude Code fit).
+Status: Phases 0-4 and 6 landed and deployed (2026-10-21): `cursor/*` models serve Claude Code with real tool use, images, mixed Claude/Cursor sessions and long tool holds (`USAGE.md`). Left: Phase 5 leftovers (end-to-end TUI login check, dashboard login button in the external repo).
 
 ## Goal
 
@@ -103,6 +103,16 @@ As built (recorded fixtures, `MAINTENANCE.md`): `helps/cursor_wire.go` (transpor
 - `claude --model cursor/<id>` end to end with real tool use in a scratch repo.
 - Cross-provider thinking signatures (`internal/signature/provider_compatibility.go`) when a session mixes Claude and Cursor models.
 - Document the switch in `docs/cursor/USAGE.md`.
+
+Done (2026-10-21, `STATUS.md` has SHAs and live results):
+- Deploys self-check: `scripts/smoke-live.sh`, run by `scripts/deploy-local.sh`, which rolls back on failure.
+- `USAGE.md`: models, limits, context window, images, mixed sessions, quota, re-login.
+- Context window: no proxy-side channel exists in Claude Code (built-in catalog only), so it is client-side (`[1m]` suffix or `CLAUDE_CODE_MAX_CONTEXT_TOKENS`); the proxy reports 1M for "1M" variants as metadata.
+- Catalog refresh on a 6 h timer with ±10 % jitter and 10 min → 1 h backoff.
+- Images: user image blocks → `selected_images`, tool_result images → MCP image content; URL sources and other types → 400.
+- `max_mode` sent for catalog `max_mode` models; `resource_exhausted` cooldowns made model-scoped.
+- Mixed sessions: the claude executor already drops unsigned (Cursor) thinking; regression tests pin both directions.
+- Live: a 2-minute tool hold, interrupt + new text, and new text without a tool_result (cancel_action) all continue correctly.
 
 Every phase ends green on `gofmt -l .`, `go build ./cmd/server`, `go test ./...`, and from Phase 2 on, the canary.
 

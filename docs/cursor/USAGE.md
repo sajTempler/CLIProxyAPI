@@ -62,6 +62,9 @@ Practical picks:
 - Thinking: when the request enables thinking, Cursor's thinking stream
   becomes `thinking` blocks (without signatures).
 - Usage: input, output and cache token counts come from Cursor's `turn_ended`.
+- Long tools and interruptions: while Claude Code runs a tool, the Cursor Run
+  stays open (heartbeats both ways; a 2-minute `sleep` was verified).
+  Interrupting a tool and typing new text continues the same conversation.
 - Subagents and side requests (titles, summaries): they get their own state
   (keyed by session id plus the first message), so they never disturb the
   main conversation.
