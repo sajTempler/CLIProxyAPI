@@ -30,6 +30,30 @@ var cursorCatalog struct {
 	mu        sync.RWMutex
 	models    []*ModelInfo
 	fetchedAt time.Time
+	// maxMode holds the Cursor ids (no prefix) whose catalog entry says
+	// max_mode=true; Runs on them request max mode, as the agent CLI does.
+	maxMode map[string]bool
+}
+
+// SetCursorMaxModeModels records which Cursor model ids (without the prefix)
+// the live catalog marks max_mode=true. It replaces the previous set.
+func SetCursorMaxModeModels(ids []string) {
+	set := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		set[strings.TrimPrefix(strings.TrimSpace(id), CursorModelPrefix)] = true
+	}
+	cursorCatalog.mu.Lock()
+	cursorCatalog.maxMode = set
+	cursorCatalog.mu.Unlock()
+}
+
+// CursorModelMaxMode reports whether Runs on id (with or without the prefix)
+// should request max mode. False until a live catalog was fetched.
+func CursorModelMaxMode(id string) bool {
+	id = strings.TrimPrefix(strings.TrimSpace(id), CursorModelPrefix)
+	cursorCatalog.mu.RLock()
+	defer cursorCatalog.mu.RUnlock()
+	return cursorCatalog.maxMode[id]
 }
 
 // NewCursorModelInfo describes one Cursor model; id is Cursor's model id
@@ -110,7 +134,7 @@ func CursorModelsFetchedAt() time.Time {
 // resetCursorModelsForTest drops the live catalog.
 func resetCursorModelsForTest() {
 	cursorCatalog.mu.Lock()
-	cursorCatalog.models, cursorCatalog.fetchedAt = nil, time.Time{}
+	cursorCatalog.models, cursorCatalog.fetchedAt, cursorCatalog.maxMode = nil, time.Time{}, nil
 	cursorCatalog.mu.Unlock()
 }
 

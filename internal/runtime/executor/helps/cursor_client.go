@@ -49,6 +49,9 @@ type CursorStreamRequest struct {
 	ConversationKey string
 	// Model is the Cursor model id (e.g. "composer-2.5").
 	Model string
+	// MaxMode requests Cursor's max mode (RequestedModel.max_mode), set for
+	// models whose catalog entry says max_mode=true.
+	MaxMode bool
 	// ResponseModel is the model name reported to the client (e.g.
 	// "cursor/composer-2.5"); empty reports Model.
 	ResponseModel string
@@ -229,7 +232,7 @@ func (c *CursorClient) prepareRun(ctx context.Context, sess *cursorSession, req 
 		ConversationId:      proto.String(convID),
 		ConversationGroupId: proto.String(convID),
 		RunId:               proto.String(uuid.NewString()),
-		RequestedModel:      &cursorpb.RequestedModel{ModelId: req.Model, MaxMode: false},
+		RequestedModel:      &cursorpb.RequestedModel{ModelId: req.Model, MaxMode: req.MaxMode},
 	}}}
 	var observer CursorFrameObserver
 	if c.Observe != nil {

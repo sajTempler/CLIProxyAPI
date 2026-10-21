@@ -69,3 +69,23 @@ func TestNewCursorModelInfoContextLengthFromDisplayName(t *testing.T) {
 		}
 	}
 }
+
+func TestCursorModelMaxMode(t *testing.T) {
+	t.Cleanup(resetCursorModelsForTest)
+	if CursorModelMaxMode("claude-opus-5-5-low-fast") {
+		t.Fatal("max mode must be off before a catalog was fetched")
+	}
+	SetCursorMaxModeModels([]string{"claude-opus-5-5-low-fast", "cursor/claude-opus-5-low-fast"})
+	for id, want := range map[string]bool{
+		"claude-opus-5-5-low-fast": true, "cursor/claude-opus-5-5-low-fast": true,
+		"claude-opus-5-low-fast": true, "composer-2.5": false,
+	} {
+		if got := CursorModelMaxMode(id); got != want {
+			t.Errorf("CursorModelMaxMode(%q) = %v, want %v", id, got, want)
+		}
+	}
+	SetCursorMaxModeModels(nil)
+	if CursorModelMaxMode("claude-opus-5-5-low-fast") {
+		t.Fatal("a new catalog replaces the set")
+	}
+}

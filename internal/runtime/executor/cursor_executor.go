@@ -213,6 +213,7 @@ func (e *CursorExecutor) prepare(ctx context.Context, auth *cliproxyauth.Auth, r
 		request: helps.CursorStreamRequest{
 			ConversationKey: key,
 			Model:           cursorModel,
+			MaxMode:         registry.CursorModelMaxMode(cursorModel),
 			ResponseModel:   req.Model,
 			Body:            body,
 		},
@@ -362,7 +363,7 @@ func (e *CursorExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 
 // cursorStatusErr maps protocol client errors to HTTP statuses the auth
 // manager understands: rejected credentials are 401, resource_exhausted is a
-// 429 with a cooldown. Context errors pass through unchanged.
+// model-scoped 429 with a cooldown. Context errors pass through unchanged.
 func cursorStatusErr(err error) error {
 	if err == nil {
 		return nil
@@ -388,8 +389,11 @@ func cursorStatusErr(err error) error {
 	case code == "unauthenticated" || se.HTTPStatus == http.StatusUnauthorized:
 		return statusErr{code: http.StatusUnauthorized, msg: msg, credentialScoped: true}
 	case code == "resource_exhausted" || se.HTTPStatus == http.StatusTooManyRequests:
+		// Model-scoped: Cursor also answers resource_exhausted for models the
+		// account may not use (the Opus *-fast ids on a Team plan), and a
+		// credential-scoped cooldown would block every cursor model with it.
 		cooldown := cursorRateLimitCooldown
-		return statusErr{code: http.StatusTooManyRequests, msg: msg, retryAfter: &cooldown, credentialScoped: true}
+		return statusErr{code: http.StatusTooManyRequests, msg: msg, retryAfter: &cooldown}
 	case code == "permission_denied" || se.HTTPStatus == http.StatusForbidden:
 		return statusErr{code: http.StatusForbidden, msg: msg, credentialScoped: true}
 	case code == "invalid_argument" || code == "failed_precondition":
@@ -420,6 +424,7 @@ func FetchCursorModels(ctx context.Context, cfg *config.Config, auth *cliproxyau
 	}
 	seen := make(map[string]bool, len(details))
 	models := make([]*registry.ModelInfo, 0, len(details))
+	var maxMode []string
 	for _, d := range details {
 		id := strings.TrimSpace(d.GetModelId())
 		if id == "" || seen[id] {
@@ -427,10 +432,14 @@ func FetchCursorModels(ctx context.Context, cfg *config.Config, auth *cliproxyau
 		}
 		seen[id] = true
 		models = append(models, registry.NewCursorModelInfo(id, d.GetDisplayName()))
+		if d.GetMaxMode() {
+			maxMode = append(maxMode, id)
+		}
 	}
 	if len(models) == 0 {
 		return nil, fmt.Errorf("cursor: GetUsableModels returned no models")
 	}
-	log.WithField("models", len(models)).Debug("cursor: fetched usable models")
+	registry.SetCursorMaxModeModels(maxMode)
+	log.WithFields(log.Fields{"models": len(models), "max_mode": len(maxMode)}).Debug("cursor: fetched usable models")
 	return models, nil
 }

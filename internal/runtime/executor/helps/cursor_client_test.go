@@ -520,3 +520,18 @@ func TestCursorStreamRejectsBadRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestCursorStreamRequestsMaxMode(t *testing.T) {
+	for _, maxMode := range []bool{true, false} {
+		rt := loadCursorFixtures(t, "plain-text")
+		conv := &cursorTestConversation{System: cursorTestSystem}
+		conv.user("Reply with one short sentence: what is 2+2?")
+		err := newCursorTestClient(rt).Stream(context.Background(), CursorStreamRequest{ConversationKey: "k", Model: "composer-2.5", MaxMode: maxMode, Body: conv.body("composer-2.5")}, func(CursorClaudeEvent) error { return nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := rt.conn(0).sentMessages()[0].GetRunRequest().GetRequestedModel().GetMaxMode(); got != maxMode {
+			t.Fatalf("requested max_mode = %v, want %v", got, maxMode)
+		}
+	}
+}

@@ -10,6 +10,7 @@ import (
 
 	cursorauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/cursor"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
@@ -174,6 +175,11 @@ func TestCursorExecutorErrorBeforeOutputIsStatus(t *testing.T) {
 		if tc.retryAfter && (se.RetryAfter() == nil || *se.RetryAfter() != cursorRateLimitCooldown) {
 			t.Fatalf("%v: want a %s cooldown", tc.err, cursorRateLimitCooldown)
 		}
+		// A 429 must not cool down the whole credential: Cursor also sends
+		// resource_exhausted for single models the account may not use.
+		if tc.status == http.StatusTooManyRequests && se.IsCredentialScoped() {
+			t.Fatalf("%v: resource_exhausted must be model-scoped", tc.err)
+		}
 	}
 }
 
@@ -262,5 +268,25 @@ func TestCursorExecutorIdentity(t *testing.T) {
 	e := NewCursorExecutor(&config.Config{})
 	if e.Identifier() != "cursor" || e.RequestToFormat(cliproxyexecutor.Request{}, cliproxyexecutor.Options{}) != sdktranslator.FormatClaude {
 		t.Fatal("cursor executor must be identified as cursor with the Claude pivot format")
+	}
+}
+
+// Models the live catalog marks max_mode=true are requested in max mode.
+func TestCursorExecutorRequestsMaxModeFromCatalog(t *testing.T) {
+	registry.SetCursorMaxModeModels([]string{"claude-opus-5-5-low-fast"})
+	t.Cleanup(func() { registry.SetCursorMaxModeModels(nil) })
+	for model, want := range map[string]bool{"cursor/claude-opus-5-5-low-fast": true, "cursor/composer-2.5": false} {
+		f := &cursorFakeStream{events: cursorTextEvents("ok")}
+		res, err := newCursorTestExecutor(&config.Config{}, f).ExecuteStream(context.Background(), cursorTestAuth(),
+			cliproxyexecutor.Request{Model: model, Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, cursorClaudeOpts())
+		if err != nil {
+			t.Fatalf("%s: %v", model, err)
+		}
+		if _, errStream := drainCursorStream(t, res); errStream != nil {
+			t.Fatalf("%s: %v", model, errStream)
+		}
+		if got := f.got[0].MaxMode; got != want {
+			t.Errorf("%s: MaxMode = %v, want %v", model, got, want)
+		}
 	}
 }

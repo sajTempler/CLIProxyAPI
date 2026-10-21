@@ -121,7 +121,7 @@ var used = map[string][]string{
 	// Models and host discovery.
 	"agent.v1.GetUsableModelsRequest":     nil,
 	"agent.v1.GetUsableModelsResponse":    {"models"},
-	"agent.v1.ModelDetails":               {"model_id", "display_name"},
+	"agent.v1.ModelDetails":               {"model_id", "display_name", "max_mode"},
 	"aiserver.v1.GetServerConfigRequest":  nil,
 	"aiserver.v1.GetServerConfigResponse": {"agent_url_config"},
 	"aiserver.v1.AgentUrlConfig":          {"agent_url", "agentn_url"},

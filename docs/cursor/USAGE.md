@@ -39,7 +39,11 @@ re-fetches it every ~6 h on a timer (failures back off from 10 min to 1 h). Unti
 proxy serves a 9-model static fallback. Ids encode the reasoning level
 (`-low`, `-medium`, `-high`, `-xhigh`, `-max`), a `-thinking` variant and a
 `-fast` (priority) variant. Cursor picks the reasoning level from the id;
-Claude Code's effort/thinking settings do not change it.
+Claude Code's effort/thinking settings do not change it. Ids the catalog marks
+`max_mode` (the 33 Opus `*-fast` variants on the Team plan) are requested in
+Cursor's max mode, as the agent CLI does. On this account they answer
+`resource_exhausted` (HTTP 429) with or without max mode, so treat them as
+unavailable.
 
 Practical picks:
 - `cursor/composer-2.5`: Cursor's own model, cheap and fast, good tool use. Default for tests.
