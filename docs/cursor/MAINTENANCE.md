@@ -63,3 +63,47 @@ Current fixtures are `source: "reconstructed"`. The Phase 0 spike kept only per-
 - What's left out: checkpoint and KV traffic.
 
 Replace them with `source: "recorded"` fixtures once the Phase 2 wire client can feed a `Recorder`.
+
+## Client version (`helps/cursor_version.go`)
+
+`GetCursorClientVersion()` and `CursorClientVersionHeader()` (`cli-<ver>`, the value for `x-cursor-client-version`) come from the `~/.local/bin/agent` symlink target. `StartCursorVersionUpdater(ctx)` reads it at start and then every 10 minutes. If the symlink breaks, the updater keeps the last good version. Without an installed agent (CI, other machines), it uses `agent_version` from the embedded `cursorpb/SNAPSHOT.txt`. Nothing calls the updater yet; Phase 4 starts it next to the xAI one.
+
+## Canary (`cmd/cursor_canary`)
+
+```bash
+go build -o bin/cursor_canary ./cmd/cursor_canary && bin/cursor_canary [--model cursor/composer-2.5]
+```
+
+The canary runs two streaming `/v1/messages` turns through the running proxy (`127.0.0.1:8317`; the key is `CPA_API_KEY` from the environment or `.env`, sent as a Bearer token like `claudep`):
+1. `lookup_secret` → expect `tool_use`;
+2. `tool_result` → expect a final answer containing the secret with `end_turn`.
+
+Use the built binary, because `go run` maps every non-zero exit to 1.
+
+| Exit | Meaning | Notifies |
+|---|---|---|
+| 0 | round-trip ok | no |
+| 1 | protocol broken (bad status, malformed stream, no `tool_use`, lost `tool_result`) | yes |
+| 2 | Cursor auth expired / rejected upstream | yes |
+| 3 | cursor provider not registered (no `cursor/*` models, or "unknown provider") | **no** |
+| 4 | inconclusive: proxy down, `CPA_API_KEY` missing/rejected, rate limited | yes |
+
+The `--timeout` deadline (default 3 minutes) is deliberate. This is a scheduled utility, not the proxy runtime.
+
+## Schedules (`scripts/cursor/`)
+
+- `maintenance.sh watch`: waits 60 s for the updater to settle, then reads the active agent version. It skips the run if this version was already checked successfully (`logs/.cursor-maintenance-last-version`). Otherwise it builds both tools into `bin/`, then runs `cursor_proto_sync --check` and then the canary.
+- `maintenance.sh daily`: canary only.
+- Logging: everything goes to `logs/cursor-maintenance.log`.
+- Notifications: failures, breaking changes and new exec types raise a macOS notification through `osascript`. `CURSOR_MAINTENANCE_NO_NOTIFY=1` silences them for manual runs.
+- `com.szymon.cursor-agent-watch.plist`: `WatchPaths` on `~/.local/share/cursor-agent/versions`, throttled to one run per 5 minutes.
+- `com.szymon.cursor-canary.plist`: daily at 09:30.
+
+Install (not done automatically):
+
+```bash
+cp scripts/cursor/com.szymon.cursor-*.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.szymon.cursor-agent-watch.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.szymon.cursor-canary.plist
+# test now: launchctl kickstart gui/$(id -u)/com.szymon.cursor-canary
+```

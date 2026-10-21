@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily cursor provider canary through the local proxy (missed runs fire after wake).
+  Install (after review):
+    cp scripts/cursor/com.szymon.cursor-canary.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.szymon.cursor-canary.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.szymon.cursor-canary</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/szymon/private/CLIProxyAPI/scripts/cursor/maintenance.sh</string>
+    <string>daily</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/szymon/private/CLIProxyAPI</string>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/szymon/private/CLIProxyAPI/logs/cursor-maintenance.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/szymon/private/CLIProxyAPI/logs/cursor-maintenance.launchd.log</string>
+</dict>
+</plist>
