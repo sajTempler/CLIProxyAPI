@@ -27,6 +27,7 @@ var oauthProviders = []oauthProvider{
 	{"Kimi (kimi.ai)", "kimi-ai-auth-url", "🟫", true},
 	{"xAI", "xai-auth-url", "⬛", true},
 	{"Meta", "meta-auth-url", "🔵", true},
+	{"Cursor", "cursor-auth-url", "⬜", true},
 }
 
 // oauthTabModel handles OAuth login flows.
@@ -364,6 +365,8 @@ func (m oauthTabModel) submitCallback(callbackURL string) tea.Cmd {
 					providerKey = "xai"
 				case "meta-auth-url":
 					providerKey = "meta"
+				case "cursor-auth-url":
+					providerKey = "cursor"
 				}
 				break
 			}
