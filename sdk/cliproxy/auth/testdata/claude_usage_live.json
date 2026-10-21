@@ -1,0 +1,15 @@
+{
+  "five_hour": {"utilization": 10.0, "resets_at": "2026-10-21T10:29:59.551785+00:00", "iguana_necktie": null},
+  "seven_day": {"utilization": 56.0, "resets_at": "2026-10-22T03:59:59.551812+00:00"},
+  "seven_day_opus": null,
+  "seven_day_sonnet": null,
+  "seven_day_oauth_apps": null,
+  "extra_usage": {"is_enabled": false, "disabled_reason": "out_of_credits", "currency": "EUR"},
+  "limits": [
+    {"kind": "session", "group": "session", "percent": 10, "resets_at": "2026-10-21T10:29:59.551785+00:00", "scope": null, "is_active": false},
+    {"kind": "weekly_all", "group": "weekly", "percent": 56, "resets_at": "2026-10-22T03:59:59.551812+00:00", "scope": null, "is_active": true},
+    {"kind": "weekly_scoped", "group": "weekly", "percent": 47, "resets_at": "2026-10-22T03:59:59.552041+00:00",
+     "scope": {"model": {"id": null, "display_name": "Fable"}, "surface": null}, "is_active": false}
+  ],
+  "weekly_scoped_shares": [{"limit_index": 2, "used_percent_of_weekly": 24, "allowance_percent_of_weekly": 50}]
+}

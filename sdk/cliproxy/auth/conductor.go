@@ -203,6 +203,8 @@ type Manager struct {
 	providerOffsets             map[string]int
 	homeDispatchBundle          atomic.Pointer[HomeDispatchBundle]
 	homeInFlightPublisherConfig atomic.Pointer[HomeInFlightPublisherConfig]
+	// claudeQuota merges Claude 5h/7d quota windows for soonest-reset routing (claude_quota.go).
+	claudeQuota atomic.Pointer[ClaudeQuotaTracker]
 
 	// Retry controls request retry behavior.
 	requestRetry        atomic.Int32

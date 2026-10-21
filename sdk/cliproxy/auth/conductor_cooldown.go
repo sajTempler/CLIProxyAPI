@@ -1334,6 +1334,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 			if modelState != nil {
 				modelState.Quota.ObserveResponseHeadersForProvider(result.Provider, responseHeaders, now)
 			}
+			m.observeClaudeQuota(result, auth.ID, responseHeaders, now)
 		}
 
 		_ = m.persistLocked(ctx, auth)

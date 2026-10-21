@@ -1,0 +1,12 @@
+{
+  "five_hour": {"utilization": 0.0, "resets_at": null},
+  "seven_day": {"utilization": 3.0, "resets_at": "2026-10-25T08:00:00+00:00"},
+  "seven_day_opus": {"utilization": 90.0, "resets_at": "2026-10-25T08:00:00+00:00"},
+  "cinder_cove": {"unknown": true},
+  "limits": [
+    {"kind": "weekly_scoped", "group": "weekly", "percent": 1, "resets_at": null,
+     "scope": {"model": {"id": null, "display_name": "Opus"}, "surface": null}, "is_active": true},
+    {"kind": "weekly_scoped", "group": "weekly", "percent": 2, "resets_at": null,
+     "scope": {"model": {"id": null, "display_name": " fable 5 "}, "surface": null}, "is_active": false}
+  ]
+}

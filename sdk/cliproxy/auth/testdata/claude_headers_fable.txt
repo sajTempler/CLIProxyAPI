@@ -1,0 +1,16 @@
+Anthropic-Ratelimit-Unified-5h-Utilization: 0.1
+Anthropic-Ratelimit-Unified-5h-Reset: 1792578600
+Anthropic-Ratelimit-Unified-5h-Status: allowed
+Anthropic-Ratelimit-Unified-7d-Utilization: 0.55
+Anthropic-Ratelimit-Unified-7d-Reset: 1792641600
+Anthropic-Ratelimit-Unified-7d-Status: allowed
+Anthropic-Ratelimit-Unified-7d_oi-Utilization: 0.46
+Anthropic-Ratelimit-Unified-7d_oi-Reset: 1792641600
+Anthropic-Ratelimit-Unified-7d_oi-Status: allowed
+Anthropic-Ratelimit-Unified-Status: allowed
+Anthropic-Ratelimit-Unified-Reset: 1792578600
+Anthropic-Ratelimit-Unified-Representative-Claim: five_hour
+Anthropic-Ratelimit-Unified-Fallback-Percentage: 0.5
+Anthropic-Ratelimit-Unified-Overage-Status: rejected
+Anthropic-Ratelimit-Unified-Overage-Disabled-Reason: out_of_credits
+Content-Type: application/json

@@ -1,0 +1,9 @@
+Anthropic-Ratelimit-Unified-5h-Utilization: 0.12
+Anthropic-Ratelimit-Unified-5h-Reset: 1792578600
+Anthropic-Ratelimit-Unified-5h-Status: allowed
+Anthropic-Ratelimit-Unified-7d-Utilization: 0.56
+Anthropic-Ratelimit-Unified-7d-Reset: 1792641600
+Anthropic-Ratelimit-Unified-7d-Status: allowed
+Anthropic-Ratelimit-Unified-Status: allowed
+Anthropic-Ratelimit-Unified-Representative-Claim: five_hour
+Content-Type: application/json

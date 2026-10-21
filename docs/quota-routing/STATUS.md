@@ -31,3 +31,9 @@ date, phase, what changed (commit SHAs), what's next, blockers. Newest at the bo
   - **Live calls used:** 3 upstream (usage, profile, one 8-token Fable message) plus local management reads.
   - **Next:** Phase 1 (tracker + passive feed).
   - **Blockers:** none. Multi-account ordering can only be proven with fake auths until a second real account exists.
+- 2026-10-21 (phase 1, commit "feat(quota-routing): add Claude quota tracker fed by response headers"):
+  - New `sdk/cliproxy/auth/claude_quota.go`: `ClaudeQuotaTracker` (per-auth, per-window merge, newer `observed_at` wins; expired windows read as fresh), header parsing (`5h`/`7d`/`7d_oi`, unix or RFC 3339 resets), usage-JSON parsing (Fable from `limits[weekly_scoped]`, `fable`/`fable 5`/`fable 5.1`, active preferred), plan + poll bookkeeping, non-blocking `RequestPoll`, `ClaudeQuotaRefresher` hook for the poller.
+  - Upstream hooks kept to 4 lines: `claudeQuota` atomic field (`conductor.go`), `m.observeClaudeQuota(...)` inside the existing `!SkipQuotaObservation` block (`conductor_cooldown.go`), `m.forgetClaudeQuota(id)` in `Remove` (`conductor_lifecycle.go`).
+  - Sanitized fixtures in `sdk/cliproxy/auth/testdata/` (live usage payload, `fable 5` + null reset variant, Fable and Opus header sets).
+  - Tests: `go test ./sdk/cliproxy/auth` green. Pre-existing: `gofmt -l` flags upstream `internal/pluginhost/host.go` (left untouched).
+  - Next: phase 2 (selector + config).

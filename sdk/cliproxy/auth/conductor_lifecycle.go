@@ -530,6 +530,7 @@ func (m *Manager) Remove(ctx context.Context, id string) {
 	m.structuralEpoch.Add(1)
 	m.queueRefreshUnschedule(id)
 	m.invalidateSessionAffinity(id)
+	m.forgetClaudeQuota(id)
 
 	if provider != "" {
 		if exec, ok := m.Executor(provider); ok && exec != nil {
