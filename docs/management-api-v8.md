@@ -104,6 +104,8 @@ retain the corresponding business operation's fields.
 | `/credentials/status` | PATCH | Change credential status. |
 | `/credentials/fields` | PATCH | Change credential fields. |
 | `/credentials/refresh` | POST | Refresh credentials. |
+| `/quota/claude` | GET | Per-account Claude quota (7-day Fable, 5-hour, 7-day windows as used/remaining percent with reset times), plan, `soonest-reset` routing rank, poll state, and a weekly summary. Emails are returned in full. |
+| `/quota/claude/refresh` | POST | Re-read Claude OAuth usage now. Body `{"auth_index": "<index>"}` for one credential or `{}` for all; answers `429 {"error":"backoff","retry_after_seconds":N}` while that credential's poll is backing off and `503` when the poller is not running. |
 | `/oauth/import?provider=vertex` | POST | Import a Vertex service account using a multipart `file` upload. |
 | `/oauth/auth-url?provider=<provider>` | GET | Start built-in or plugin OAuth. |
 | `/oauth/siwc/bind` | POST | Start SIWC binding to an existing file-backed Codex OAuth credential. |
