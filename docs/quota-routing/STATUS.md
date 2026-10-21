@@ -64,3 +64,29 @@ date, phase, what changed (commit SHAs), what's next, blockers. Newest at the bo
   - Next: phase 6 (live verification, SPEC section 7) and phase 7 (MC fork UI) — not started by this agent.
   - Full `go test ./...` after phase 5: 8219 passed, 10 skipped, 1 failed — `internal/client/codex/live` `TestPionMediaRelayBridgesAudioAndDataChannel` ("upstream DataChannel was not created"), which also fails on the base commit `d52d2924` (pre-existing, local WebRTC environment). `gofmt -l` flags only upstream `internal/pluginhost/host.go` (pre-existing).
   - Open decisions for the user: skipped-account ordering uses the latest blocking reset (unblock time); summary counts a loaded account lacking the weekly window as 100 % remaining; GET lists only Claude OAuth credentials (API-key Claude credentials are omitted); background poller ignores `RequestPoll` when the interval is 0.
+- 2026-10-21 (adversarial review of `main..feat/quota-routing`):
+  - **Fixed** `bc83d58b`: the soonest-reset tie comparator ("within 1 min" pairwise) was not transitive. With chained near-ties (a~b, b~c, a and c 100 s apart) the order followed the input order, and an account resetting later could rank ahead of a sooner one. Ties now group around the soonest reset of each run. Test: `TestSoonestReset_TieWindowIsTransitiveAcrossInputOrders`.
+  - **Fixed** `f95c5d92`: a usage-endpoint 429/403 set the next background poll to `now + backoff` (5 min without Retry-After). With the 10 min default, that polled a rate-limited bearer twice as often. The next poll is now the later of the backoff and the regular jittered interval. Manual refresh is still gated only by the backoff. Test: `TestPollerBackoffNeverShortensRegularInterval`. `TestPollerRateLimitBackoff` was updated to the corrected schedule.
+  - **Verified OK:**
+    - Fable-first weekly key with a 7d fallback; the 5h skip at the threshold or `rejected`; the Fable skip only on Fable routes; unknown accounts after eligible ones; expired windows read as fresh.
+    - Cooldown filtering through `getSelectorAvailableAuths`, so the existing 429 cooldown stays authoritative.
+    - The selector runs only as the affinity `Fallback`, on cold bindings and failover. It stays custom, so there is no scheduler fast path.
+    - `-race` is clean on every touched package, and no goroutines are created on hot reload. `Stop` cancels and waits.
+    - No token refresh. Logs are Debug only, with no token.
+    - The v8 routes sit behind management auth.
+    - Hot-file edits are 1–8 lines each.
+  - **Decisions (STATUS phase 5):**
+    1. Skipped accounts ordered by their latest blocking reset (unblock time): agreed. SPEC section 3.6 still says "earliest" and should be updated to match.
+    2. A loaded account missing the weekly window counts as 100 % remaining: agreed. It only affects accounts missing `seven_day`, which is rare.
+    3. GET lists Claude OAuth credentials only: agreed.
+    4. `RequestPoll` is ignored when the interval is 0: agreed, since "0 = off" stays off and manual refresh still works.
+  - **Not fixed (unconfirmed or minor):**
+    - Background `due()` is not atomic with the in-flight reservation, so in theory there can be a double poll if a queued `RequestPoll` races a launched goroutine that finishes first. No practical trigger was found.
+    - The first poll after start, and after any interval change, hits every account at once, without jitter. A crash loop would repoll on each restart.
+    - Profile-endpoint failures, including 429/403, have no backoff and are retried on each successful usage poll.
+    - A poll that finishes after `Remove` re-creates tracker state for the removed ID (a tiny leak).
+    - The dashboard's dry-run rank includes disabled credentials.
+    - Changing `skip-five-hour-at` rebuilds the affinity selector and drops bindings. This is the upstream pattern for any routing change.
+    - Fable-route detection is a model-name substring, so aliases without "fable" don't apply the Fable skip.
+    - Pre-existing: a `-race` failure in the untouched `internal/api/middleware` (`TestRequestLoggingMiddleware_StreamingPreservesFullUUIDForLogger`).
+  - **Next:** phase 6 live verification (SPEC section 7).
