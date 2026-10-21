@@ -480,7 +480,12 @@ func (p *Poller) doPoll(ctx context.Context, authID string) error {
 		p.mu.Lock()
 		p.stateLocked(authID).backoffUntil = now.Add(backoff)
 		p.mu.Unlock()
-		return p.finish(authID, started, &coreauth.ClaudeQuotaBackoffError{Status: status, RetryAfter: backoff}, now.Add(backoff))
+		// Backoff only delays: the next background poll is never earlier than the regular schedule.
+		next := now.Add(backoff)
+		if regular := p.nextAfter(now); regular.After(next) {
+			next = regular
+		}
+		return p.finish(authID, started, &coreauth.ClaudeQuotaBackoffError{Status: status, RetryAfter: backoff}, next)
 	case status == http.StatusUnauthorized:
 		return p.finish(authID, started, ErrUnauthorized, p.nextAfter(now))
 	case status != http.StatusOK:

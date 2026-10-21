@@ -239,8 +239,13 @@ func TestPollerRateLimitBackoff(t *testing.T) {
 			if !errors.As(err, &backoff) || backoff.RetryAfter != tc.want || backoff.Status != tc.code {
 				t.Fatalf("err = %v (%+v), want backoff %v", err, backoff, tc.want)
 			}
+			// The next background poll is the later of the backoff and the regular interval.
+			nextPoll := tc.want
+			if nextPoll < 10*time.Minute {
+				nextPoll = 10 * time.Minute
+			}
 			snap, _ := f.tracker.Snapshot("a")
-			if !snap.NextPollAt.Equal(pollStart.Add(tc.want)) || !strings.Contains(snap.PollError, "rate_limited") {
+			if !snap.NextPollAt.Equal(pollStart.Add(nextPoll)) || !strings.Contains(snap.PollError, "rate_limited") {
 				t.Fatalf("snapshot = %+v", snap)
 			}
 			// During backoff neither a manual refresh nor a background poll reaches upstream.
@@ -253,7 +258,7 @@ func TestPollerRateLimitBackoff(t *testing.T) {
 			if hits := f.server.usageHits("fake-a"); hits != 1 {
 				t.Fatalf("usage hits during backoff = %d, want 1", hits)
 			}
-			f.clock.Advance(time.Second)
+			f.clock.Advance(nextPoll - tc.want + time.Second)
 			f.server.set("fake-a", body(usagePayloadA))
 			f.poller.pollDue(context.Background(), true)
 			if hits := f.server.usageHits("fake-a"); hits != 2 {
@@ -473,5 +478,35 @@ func TestPlanLabel(t *testing.T) {
 		if got := PlanLabel(tc.tier, tc.org, tc.hasMax, tc.hasPro); got != tc.want {
 			t.Fatalf("PlanLabel(%+v) = %q, want %q", tc, got, tc.want)
 		}
+	}
+}
+
+// A 429/403 must never pull the next background poll earlier than the regular
+// interval: with a 1 h interval, a 429 without Retry-After (5 min backoff) used
+// to schedule the next poll in 5 min, polling a rate-limited bearer faster.
+func TestPollerBackoffNeverShortensRegularInterval(t *testing.T) {
+	f := newPollerFixture(t, time.Hour, claudeAuth("a", "fake-a"))
+	f.server.set("fake-a", status(http.StatusTooManyRequests, ""))
+	f.poller.pollDue(context.Background(), true)
+	if hits := f.server.usageHits("fake-a"); hits != 1 {
+		t.Fatalf("first poll hits = %d, want 1", hits)
+	}
+	snap, _ := f.tracker.Snapshot("a")
+	if !snap.NextPollAt.Equal(pollStart.Add(time.Hour)) {
+		t.Fatalf("next poll = %v, want %v", snap.NextPollAt, pollStart.Add(time.Hour))
+	}
+	f.server.set("fake-a", body(usagePayloadA))
+	f.clock.Advance(6 * time.Minute) // past the 5 min backoff, well inside the interval
+	f.poller.pollDue(context.Background(), true)
+	f.poller.pollRequested(context.Background(), "a", true)
+	if hits := f.server.usageHits("fake-a"); hits != 1 {
+		t.Fatalf("background polls after backoff but before interval = %d, want 1", hits)
+	}
+	// Manual refresh is gated only by the backoff, which has passed.
+	if err := f.poller.Refresh(context.Background(), "a"); err != nil {
+		t.Fatalf("manual refresh after backoff: %v", err)
+	}
+	if hits := f.server.usageHits("fake-a"); hits != 2 {
+		t.Fatalf("hits after manual refresh = %d, want 2", hits)
 	}
 }
