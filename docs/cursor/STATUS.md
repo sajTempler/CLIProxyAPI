@@ -8,7 +8,8 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
 
 - Running proxy: LaunchAgent `com.szymon.cliproxyapi`, `127.0.0.1:8317`, config `config.yaml`, keys in `.env` (`CPA_API_KEY`, `MANAGEMENT_PASSWORD`). Never print key values.
 - Proxy logs: `logs/launchd.out.log`, `logs/launchd.err.log`.
-- Redeploy after changes: `scripts/deploy-local.sh` (main checkout only; single kickstart, keeps a rollback binary). Never bootout/bootstrap the LaunchAgent.
+- Redeploy after changes: `scripts/deploy-local.sh` (main checkout only; single kickstart, keeps a rollback binary). It self-checks: after the kickstart it runs `scripts/smoke-live.sh`; if that fails it restores `bin/cli-proxy-api-rollback`, kickstarts again, re-runs the smoke and exits non-zero. A failed deploy therefore leaves the previous binary live. Never bootout/bootstrap the LaunchAgent.
+- Smoke the live proxy any time: `scripts/smoke-live.sh` (management page, `/v8/management/quota/{claude,cursor}`, one tiny `claude-haiku-5-5` and one `cursor/composer-2.5` answer via `claudep` from a scratch dir outside the repo; costs 1 Cursor run, ~10 s). `SMOKE_SKIP_MODELS=1` skips the model answers; `SMOKE_FORCE_FAIL=1` makes it fail after the management checks (with `deploy-local.sh` it exercises the rollback path).
 - Claude auth file: `~/.cli-proxy-api/claude-*.json`. Cursor token: macOS keychain, service `cursor-access-token`, account `cursor-user`. Never print token values.
 - Installed agent CLI: `~/.local/bin/agent` → `~/.local/share/cursor-agent/versions/<ver>/`.
 - Upstream remote: `upstream` (router-for-me/CLIProxyAPI). Keep the provider isolated (Devin pattern) to keep upstream merges cheap.
