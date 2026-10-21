@@ -1,6 +1,6 @@
 # Plan: `cursor` upstream provider (native, Track A)
 
-Status: planned, not started (2026-10-21).
+Status: Phase 0 GO, Phase 1 tooling landed (2026-10-21). Next: Phase 2.
 
 ## Goal
 
