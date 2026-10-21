@@ -145,9 +145,13 @@ A `claudep` session can switch between `claude-*` and `cursor/*` models
 (`/model`, or `--resume` with another `--model`).
 - Claude to Cursor: the Cursor conversation starts from the transcript
   (Claude's thinking blocks are not forwarded).
-- Cursor to Claude: Cursor's unsigned thinking blocks are dropped before the
-  request goes to Anthropic, which would reject them. Text and tool calls
-  stay.
+- Cursor to Claude: Cursor's thinking blocks are unsigned (Claude Code stores
+  `signature: ""`), and Anthropic would reject them, so the claude provider
+  drops them before the request leaves the proxy. Text and tool calls stay.
+
+Verified live: one `claudep` session went composer-2.5 → claude-haiku-5-5 →
+composer-2.5 via `--resume <id> --model ...` (51, 52, 53), with Cursor
+thinking blocks in the history and no upstream error.
 
 ## Quota
 

@@ -535,3 +535,30 @@ func TestCursorStreamRequestsMaxMode(t *testing.T) {
 		}
 	}
 }
+
+// Cursor thinking has no Anthropic signature, and the emitter must not invent
+// one: an unsigned block is what lets the claude executor recognize and drop
+// it when the session switches back to a Claude model.
+func TestCursorStreamThinkingCarriesNoSignature(t *testing.T) {
+	rt := loadCursorFixtures(t, "plain-text")
+	conv := &cursorTestConversation{System: cursorTestSystem, Thinking: true}
+	conv.user("Reply with one short sentence: what is 2+2?")
+	var events []CursorClaudeEvent
+	err := newCursorTestClient(rt).Stream(context.Background(), CursorStreamRequest{ConversationKey: "k", Model: "composer-2.5", Body: conv.body("composer-2.5")}, func(ev CursorClaudeEvent) error {
+		events = append(events, ev)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sawThinking := false
+	for _, ev := range events {
+		sawThinking = sawThinking || strings.Contains(string(ev.Data), `"thinking_delta"`)
+		if strings.Contains(string(ev.Data), "signature") {
+			t.Fatalf("event carries a signature: %s", ev.Data)
+		}
+	}
+	if !sawThinking {
+		t.Fatal("fixture produced no thinking to check")
+	}
+}

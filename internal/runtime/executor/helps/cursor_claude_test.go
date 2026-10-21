@@ -1,6 +1,9 @@
 package helps
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseCursorClaudeRequest(t *testing.T) {
 	body := []byte(`{"system":"sys\nPrimary working directory: /work/repo\n","thinking":{"type":"adaptive"},
@@ -64,5 +67,22 @@ func TestParseCursorClaudeRequestFoldsSystemMessages(t *testing.T) {
 	}
 	if got := textOf(req.Messages[0]); got != "<system_message>\nearly note\n</system_message>\n\nhello" {
 		t.Fatalf("first user text = %q", got)
+	}
+}
+
+// A conversation that switches from a Claude model to a Cursor model seeds
+// its transcript without Claude's thinking (signed or redacted).
+func TestCursorTranscriptOmitsClaudeThinking(t *testing.T) {
+	body := []byte(`{"messages":[
+		{"role":"user","content":"hi"},
+		{"role":"assistant","content":[{"type":"thinking","thinking":"claude secret thought","signature":"EqQBCkYIBRgCKkB"},{"type":"redacted_thinking","data":"EmwKAhgBEgy"},{"type":"text","text":"hello"}]},
+		{"role":"user","content":"switch to cursor"}]}`)
+	req, err := parseCursorClaudeRequest(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := cursorTranscript(req.Messages)
+	if strings.Contains(got, "secret thought") || strings.Contains(got, "EmwKAhgBEgy") || !strings.Contains(got, "hello") || !strings.HasSuffix(got, "switch to cursor") {
+		t.Fatalf("transcript = %q", got)
 	}
 }
