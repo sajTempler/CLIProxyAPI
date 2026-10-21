@@ -75,7 +75,7 @@ run_canary() {
   printf '%s\n' "$out" | sed 's/^/    /' >>"$log"
   case "$rc" in
     0) logln "canary ok" ;;
-    3) logln "canary: cursor provider not registered (expected before Phase 4); no notification" ;;
+    3) logln "canary: cursor provider not registered (no cursor auth loaded); no notification" ;;
     1) logln "canary: PROTOCOL BROKEN"; notify "Cursor canary: protocol broken" "${out#cursor_canary: }" ;;
     2) logln "canary: AUTH EXPIRED"; notify "Cursor canary: auth expired" "Re-login needed: ${out#cursor_canary: }" ;;
     *) logln "canary inconclusive (exit $rc)"; notify "Cursor canary: inconclusive" "${out#cursor_canary: }" ;;

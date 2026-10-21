@@ -88,7 +88,7 @@ Scenarios: `plain-text`, `tool-roundtrip`, `two-tools`, `two-tools-gpt`, `two-to
 
 ## Client version (`helps/cursor_version.go`)
 
-`GetCursorClientVersion()` and `CursorClientVersionHeader()` (`cli-<ver>`, the value for `x-cursor-client-version`) come from the `~/.local/bin/agent` symlink target. `StartCursorVersionUpdater(ctx)` reads it at start and then every 10 minutes. If the symlink breaks, the updater keeps the last good version. Without an installed agent (CI, other machines), it uses `agent_version` from the embedded `cursorpb/SNAPSHOT.txt`. Nothing calls the updater yet; Phase 4 starts it next to the xAI one.
+`GetCursorClientVersion()` and `CursorClientVersionHeader()` (`cli-<ver>`, the value for `x-cursor-client-version`) come from the `~/.local/bin/agent` symlink target. `StartCursorVersionUpdater(ctx)` reads it at start and then every 10 minutes. If the symlink breaks, the updater keeps the last good version. Without an installed agent (CI, other machines), it uses `agent_version` from the embedded `cursorpb/SNAPSHOT.txt`. The proxy starts it next to the xAI updater (`sdk/cliproxy/service_lifecycle.go`).
 
 ## Canary (`cmd/cursor_canary`)
 
@@ -100,13 +100,15 @@ The canary runs two streaming `/v1/messages` turns through the running proxy (`1
 1. `lookup_secret` → expect `tool_use`;
 2. `tool_result` → expect a final answer containing the secret with `end_turn`.
 
+Both turns carry one random `X-Claude-Code-Session-Id`, as Claude Code does, so turn 2 continues the Run held open by turn 1. `/v1/models` lists non-Claude ids as `claude-fable-5-dd-<id reversed>` to clients that send `anthropic-version`; the canary decodes that form. After a passing round-trip it reads only the `expired` field of the `cursor-*.json` files in `--auth-dir` (default `~/.cli-proxy-api`, env `CURSOR_CANARY_AUTH_DIR`) and exits 2 with `Cursor login expires in N days` when an enabled login expires within 7 days. It never reads or prints tokens.
+
 Use the built binary, because `go run` maps every non-zero exit to 1.
 
 | Exit | Meaning | Notifies |
 |---|---|---|
 | 0 | round-trip ok | no |
 | 1 | protocol broken (bad status, malformed stream, no `tool_use`, lost `tool_result`) | yes |
-| 2 | Cursor auth expired / rejected upstream | yes |
+| 2 | Cursor auth expired / rejected upstream, or a login expires within 7 days | yes |
 | 3 | cursor provider not registered (no `cursor/*` models, or "unknown provider") | **no** |
 | 4 | inconclusive: proxy down, `CPA_API_KEY` missing/rejected, rate limited | yes |
 

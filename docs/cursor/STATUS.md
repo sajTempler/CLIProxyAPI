@@ -86,3 +86,32 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
     - Not tested live: new user text while a Run is held (`cancel_action` path) and holds lasting minutes.
     - Thinking signatures are left for Phase 6.
 - 2026-10-21: folded all branches (quota-routing, cursor-usage, cursor-auth, cursor-provider incl. Phase 2, deploy script) into `main`, pushed, deployed `main`; removed all worktrees. Full suite: only the 2 pre-existing failures (codex/live WebRTC, discovery mDNS); fixed the no-copy invariant for the Connect frame (`11af5204`). Next: Phase 4 executor.
+- 2026-10-21, Phase 4 executor + registration: landed and deployed on `main`. Live: 10 Cursor requests of the 40 budget, all composer-2.5, plus 1 `GetUsableModels`.
+  - `40ed92a5`: `cursor_executor.go` (`RequestToFormat` = `FormatClaude`; translate, thinking, then payload rules last with a regression test; conversation key = Claude Code session + agent scope). Errors before output map to statuses: `unauthenticated` 401, `resource_exhausted` 429 with a 1 min cooldown, `permission_denied` 403, else 502. Errors after output become an error chunk, which the Claude handler writes as an `error` event. `Refresh` delegates to `CursorAuth.Refresh`; agent-import and browser logins get a re-login message that is not a 401, so the token is used until it expires. `CountTokens` = len/4. The token and a proxy-aware HTTP/2 client (no timeouts) are bound per request through `helps.WithCursorCall`. Sessions are process-wide (they survive executor re-registration) and swept every minute. `StartCursorVersionUpdater` starts next to the xAI one. Models: `registry.GetCursorModels()` serves the live `GetUsableModels` catalog (fetched in the background on registration, reused 6 h) or a 9-model static fallback, all as `cursor/<id>`; registered in `service_models.go`, executor baseline list, `requestToFormat`.
+  - `e054b270`, `89aede54`: the canary sends one `X-Claude-Code-Session-Id` per run (turn 2 continues the held Run), decodes cloaked model ids, and exits 2 with `Cursor login expires in N days` within 7 days of the auth file's `expired` (reads nothing else).
+  - `570168e2`: Claude Code sends mid-conversation `role: "system"` messages and can end a request with one. The parser rejected that with a 502, so Claude Code retried for minutes and the auth went into cooldown (503s). System text now rides on the adjacent user turn, and unmappable requests answer 400.
+  - Live verification:
+    - `/v1/models` lists 265 `cursor/*` models.
+    - `claudep -p --model cursor/composer-2.5` answered `pong` (12.6 s with the full Claude Code prompt).
+    - A Read tool turn in a scratch dir outside the repo answered `Phase Four Scratch`.
+    - `claude-haiku-5-5` via `claudep` still works.
+    - `/v8/management/quota/{claude,cursor}` both return 200.
+    - The canary passes directly and through `maintenance.sh daily` (exit 0).
+    - `cursor_proto_sync --check` exits 0 (`ModelDetails.model_id`/`display_name` were already in `used`).
+  - Findings:
+    - `/v1/models` shows non-Claude ids as `claude-fable-5-dd-<reversed>` to clients sending `anthropic-version` (existing upstream cloaking). `/v1/messages` accepts both forms.
+    - Claude Code warns that it doesn't recognize `cursor/composer-2.5` and assumes a 200k context window.
+    - In a scratch dir inside this repo, Claude Code loads the repo `CLAUDE.md`, and composer read the repo-root README instead. Keep test dirs outside the repo.
+    - Some `GetUsableModels` entries (`*-fast` Opus variants) have `max_mode=true`; `RequestedModel.max_mode` is always sent false.
+  - Gate: gofmt clean (except pre-existing `internal/pluginhost/host.go`), `go build ./cmd/server`. `go test ./...` fails only on the 2 pre-existing tests (codex/live WebRTC, discovery mDNS); `internal/util` no-copy passes. `-race` is clean on `helps/...`, `cmd/cursor_canary`, `cmd/cursor_proto_sync`, `internal/registry` and the cursor executor/service tests.
+  - Open for Phase 5/6:
+    - Phase 5 is mostly done already (Phase 3 added `StartOAuthV8`, `NormalizeOAuthProvider`, the TUI entry and the v0 route). Left: an end-to-end TUI login check and the dashboard button (external repo).
+    - Phase 6:
+      - Thinking signatures: none are emitted, and mixing Claude and Cursor models in one session is untested.
+      - Claude Code's context window for `cursor/*` ids.
+      - `docs/cursor/USAGE.md`.
+      - Images are still dropped.
+      - `max_mode` models.
+      - Not tested live: minutes-long tool holds and the `cancel_action` path (new user text while a Run is held).
+    - The catalog is only re-fetched when an auth re-registers (6 h max age).
+    - The launchd plists are still not installed.

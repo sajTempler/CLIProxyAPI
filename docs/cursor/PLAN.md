@@ -1,6 +1,6 @@
 # Plan: `cursor` upstream provider (native, Track A)
 
-Status: Phase 0 GO, Phase 1 tooling and Phase 2 protocol client landed (2026-10-21). Next: Phase 3 (auth) / Phase 4 (executor).
+Status: Phases 0-4 landed and deployed (2026-10-21): `cursor/*` models serve Claude Code with real tool use. Next: Phase 5 (management + TUI) / Phase 6 (Claude Code fit).
 
 ## Goal
 
