@@ -53,3 +53,19 @@ func TestSetCursorModelsReplacesFallback(t *testing.T) {
 		t.Fatalf("fetchedAt = %v", CursorModelsFetchedAt())
 	}
 }
+
+func TestNewCursorModelInfoContextLengthFromDisplayName(t *testing.T) {
+	cases := map[string]int{
+		"Claude Opus 5.5 1M High":    1000000,
+		"GPT-5.5 1M":                 1000000,
+		"Composer 2.5":               200000,
+		"Gemini 3.1 Pro":             200000,
+		"Claude 1Mx":                 200000,
+		"Claude Fable 5 1M (NO ZDR)": 1000000,
+	}
+	for name, want := range cases {
+		if got := NewCursorModelInfo("x", name).ContextLength; got != want {
+			t.Errorf("%q: ContextLength = %d, want %d", name, got, want)
+		}
+	}
+}

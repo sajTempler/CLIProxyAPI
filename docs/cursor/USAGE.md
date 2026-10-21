@@ -87,19 +87,37 @@ Practical picks:
 
 ## Context window
 
-Claude Code learns a model's context window only from its built-in model
-catalog. For a gateway it does not read `/v1/models` metadata, so the proxy
+Claude Code takes a model's context window from its built-in catalog only.
+Through a gateway it does not read `/v1/models` metadata (checked in Claude
+Code 2.1.306: its served catalog is first-party only, the published one is
+signed, and gateway model discovery reads only ids and labels), so the proxy
 cannot announce windows. For an unrecognized id such as `cursor/*` it assumes
-200k and auto-compacts there. That is the right setting for most Cursor
-models. For a model with a larger window, tell Claude Code on the client side:
+200k and auto-compacts there, which matches most Cursor models.
+
+For the 1M variants (Cursor display names with "1M"; the proxy reports them
+as `max_input_tokens: 1000000` in `/v1/models`), tell Claude Code on the
+client side:
 
 ```bash
-CLAUDE_CODE_MAX_CONTEXT_TOKENS=400000 claudep --model cursor/<id>
+claudep --model 'cursor/claude-opus-5-5-high[1m]'                  # 1M window
+CLAUDE_CODE_MAX_CONTEXT_TOKENS=400000 claudep --model cursor/<id>  # any other size
 ```
 
-The variable applies to unrecognized ids that don't start with `claude-`,
-which covers every `cursor/*` id; Claude models in the same session keep
-their own windows.
+Claude Code strips `[1m]` before sending (verified: the proxy receives
+`cursor/<id>`). `CLAUDE_CODE_MAX_CONTEXT_TOKENS` applies to unrecognized ids
+that don't start with `claude-`, which covers every `cursor/*` id; Claude
+models in the same session keep their own windows.
+
+Which ids are 1M (decodes the cloaked ids Claude Code-style clients get):
+
+```bash
+curl -s -H "Authorization: Bearer $k" -H 'anthropic-version: 2023-06-01' 'http://127.0.0.1:8317/v1/models?limit=1000' \
+  | python3 -c 'import json,sys; [print(m["id"][len("claude-fable-5-dd-"):][::-1] if m["id"].startswith("claude-fable-5-dd-") else m["id"]) for m in json.load(sys.stdin)["data"] if m.get("owned_by")=="cursor" and m.get("max_input_tokens")==1000000]'
+```
+
+The window only decides when Claude Code compacts. A compacted conversation
+has a new first message, so the proxy starts a new Cursor conversation from
+the summary.
 
 ## Images
 

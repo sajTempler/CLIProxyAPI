@@ -116,3 +116,7 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
       - Not tested live: minutes-long tool holds and the `cancel_action` path (new user text while a Run is held).
     - The catalog is only re-fetched when an auth re-registers (6 h max age).
     - The launchd plists are still not installed.
+- 2026-10-21, Phase 6 (Claude Code fit), in progress. Live Cursor runs are counted against a 40-run budget across Phase 6.
+  - `fcf8a4af`: `scripts/smoke-live.sh` + self-checking `scripts/deploy-local.sh` (environment section above). Rollback tested with `SMOKE_FORCE_FAIL=1 scripts/deploy-local.sh`: the first smoke failed, the rollback binary went live (sha matched), the second smoke passed, exit 1.
+  - `d5a855d2`: `docs/cursor/USAGE.md`.
+  - Context window: Claude Code 2.1.306 learns windows only from its built-in catalog. Its served catalog is first-party only, the published catalog is signed, `[modelCapabilities]` is compiled off, and gateway model discovery (`CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY`) reads only ids/labels. So no proxy-side fix exists. Client side: `[1m]` suffix (verified: Claude Code strips it, the proxy receives `cursor/<id>`) or `CLAUDE_CODE_MAX_CONTEXT_TOKENS`, documented in USAGE.md and `claudep`. The proxy now reports `context_length`/`max_input_tokens` 1M for Cursor models whose display name has "1M" (metadata only).

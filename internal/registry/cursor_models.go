@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -46,12 +47,27 @@ func NewCursorModelInfo(id, displayName string) *ModelInfo {
 		OwnedBy:                   "cursor",
 		Type:                      "cursor",
 		DisplayName:               displayName + " (Cursor)",
-		ContextLength:             200000,
+		ContextLength:             cursorContextLength(displayName),
 		MaxCompletionTokens:       64000,
 		Thinking:                  &ThinkingSupport{Min: 1024, Max: 128000, ZeroAllowed: true, DynamicAllowed: true},
 		SupportedInputModalities:  []string{"text"},
 		SupportedOutputModalities: []string{"text"},
 	}
+}
+
+// cursorOneMillionName matches Cursor display names of 1M-context variants
+// ("Claude Opus 5.5 1M High", "GPT-5.5 1M"). GetUsableModels carries no
+// window size; the name is the only signal.
+var cursorOneMillionName = regexp.MustCompile(`(^|\s)1M(\s|$)`)
+
+// cursorContextLength is the advertised context window: 1M for "1M"
+// variants, otherwise 200k (Cursor's default window). Metadata only:
+// Claude Code does not read it from a gateway (docs/cursor/USAGE.md).
+func cursorContextLength(displayName string) int {
+	if cursorOneMillionName.MatchString(displayName) {
+		return 1000000
+	}
+	return 200000
 }
 
 // GetCursorModels returns the live Cursor catalog when one was fetched,
