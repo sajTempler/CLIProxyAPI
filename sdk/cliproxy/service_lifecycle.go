@@ -102,6 +102,7 @@ func (s *Service) Run(ctx context.Context) error {
 		s.coreManager.StartAutoRefresh(ctx, interval)
 		log.Infof("core auth auto-refresh started (interval=%s)", interval)
 		s.startClaudeQuotaPoller(ctx)
+		s.startCursorQuotaPoller(ctx)
 	}
 
 	if !homeEnabled {
@@ -328,6 +329,7 @@ func (s *Service) Shutdown(ctx context.Context) error {
 		if s.coreManager != nil {
 			s.coreManager.StopAutoRefresh()
 			s.stopClaudeQuotaPoller()
+			s.stopCursorQuotaPoller()
 		}
 		if watcher := s.currentWatcher(); watcher != nil {
 			if err := watcher.Stop(); err != nil {

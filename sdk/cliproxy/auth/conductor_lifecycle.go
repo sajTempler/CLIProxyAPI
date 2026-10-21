@@ -531,6 +531,7 @@ func (m *Manager) Remove(ctx context.Context, id string) {
 	m.queueRefreshUnschedule(id)
 	m.invalidateSessionAffinity(id)
 	m.forgetClaudeQuota(id)
+	m.forgetCursorQuota(id)
 
 	if provider != "" {
 		if exec, ok := m.Executor(provider); ok && exec != nil {

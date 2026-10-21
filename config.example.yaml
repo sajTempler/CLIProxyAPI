@@ -162,6 +162,11 @@ routing:
   #   refresh-interval: "10m"
   #   # 5-hour used percent at which soonest-reset skips an account for new sessions.
   #   skip-five-hour-at: 100
+  # Cursor usage tracking (display only) for `type: "cursor"` auth files.
+  # cursor-quota:
+  #   # DashboardService usage poll interval per Cursor account. Empty = 15m,
+  #   # "0" disables background polling. Minimum 1m.
+  #   refresh-interval: "15m"
   # Enable universal session-sticky routing for all clients.
   # Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,
   # followed by prompt_cache_key, Responses conversation IDs, legacy body IDs,
