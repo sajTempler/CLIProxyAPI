@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Weekly upstream watch for the proxy and panel forks, Monday 09:00 (a run missed during
+  sleep fires after wake). Reports only; never merges. See docs/UPSTREAM.md.
+  Install:
+    cp scripts/com.szymon.upstream-watch.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.szymon.upstream-watch.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.szymon.upstream-watch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/szymon/private/CLIProxyAPI/scripts/upstream-watch.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/szymon/private/CLIProxyAPI</string>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/szymon/private/CLIProxyAPI/logs/upstream-watch.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/szymon/private/CLIProxyAPI/logs/upstream-watch.launchd.log</string>
+</dict>
+</plist>
