@@ -29,7 +29,8 @@ Claude Code ──/v1/messages──▶ proxy ──claude──▶ api.anthropi
 - Pivot format: `FormatClaude` (the only client is Claude Code; no lossy hop).
 - Claude Code tools → offered to Cursor as MCP tools; MCP exec requests → `tool_use` blocks.
 - Cursor built-in exec requests (shell, read, write, grep, ...) → soft-deny so the model falls back to the offered tools.
-- Tool round-trip: replay first (stateless: each Claude Code request starts a new `Run` with `conversation_history`). Holding the stream open across HTTP requests is an optimization for later, only if replay is too slow or loses quality.
+- Stateful sessions (Phase 0 result, `SPIKE.md`): the server ignores `conversation_history`, so replay is out. Each Claude Code conversation gets a store with the last checkpoint and its KV blobs; a tool round-trip holds the `Run` open until the `tool_result` arrives.
+- System prompt: one `global` rule in `RequestContext.rules` (the only channel that dominates). No `x-cursor-checksum`.
 
 ## Phase 0: spike (go/no-go, throwaway, ~2 days)
 
@@ -64,9 +65,15 @@ Schedules (local launchd, because they need the keychain token and the installed
 
 ## Phase 2: protocol client (`helps/cursor_wire.go`, `helps/cursor_session.go`)
 
-- Connect bidi stream over HTTP/2; host discovery via `ServerConfigService/GetServerConfig`; headers from Phase 1.
-- Blob store (in-memory per run), answer the context request, soft-deny unknown exec types (log type name at warn level so the watch job surfaces them).
-- Claude request JSON ↔ `Run` messages; stream events → Claude SSE events (text, thinking, `tool_use`, usage, stop reason).
+Design from `SPIKE.md` ("Recommendation"); replay through `conversation_history` does not work.
+- Connect bidi stream over HTTP/2; host discovery via `ServerConfigService/GetServerConfig`; headers from Phase 1; no `x-cursor-checksum`.
+- Session store per conversation: last `conversation_checkpoint_update` bytes + KV blobs (answer `get_blob`/`set_blob` from it).
+- Tool round-trip: end the Claude response with `stop_reason: tool_use`, keep the `Run` open (heartbeats), answer `mcp_result` when the next request brings the matching `tool_result`. Registry of pending exec ids keyed by `tool_use_id`.
+- New user turn: new `Run` with the stored checkpoint + `user_message_action`. Lost `Run`: checkpoint + `resume_action`, match the regenerated `mcp_args` to the cached `tool_result`. No state (first request of an existing conversation, or history from another provider): transcript seeded into the user text.
+- System prompt + "built-ins are unavailable, use the `claude-code` MCP tools" as one `global` rule. Never `system_prompt_spec`/`system_prompt_override`/`custom_system_prompt`.
+- Tools via `mcp_meta_tool_options` with full descriptors; answer `mcp_state_exec_args`; hide `get_mcp_tools`/`mcp_tool_call` updates from Claude Code.
+- Soft-deny every built-in exec (typed `rejected`/`error`, `stream_close` for `shell_stream`), log the type name at warn level.
+- Stream events → Claude SSE events (text, thinking, `tool_use`, usage from `turn_ended`, stop reason).
 
 ## Phase 3: auth (`internal/auth/cursor`, `sdk/auth/cursor.go`, `--cursor-login`)
 
