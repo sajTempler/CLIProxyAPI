@@ -7,7 +7,7 @@ func TestParseCursorClaudeRequest(t *testing.T) {
 		"tools":[{"name":"Bash","description":"run","input_schema":{"type":"object","properties":{"command":{"type":"string"}}}}],
 		"messages":[{"role":"user","content":"hello"},
 			{"role":"assistant","content":[{"type":"thinking","thinking":"t","signature":"s"},{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"ls"}}]},
-			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":true,"content":[{"type":"text","text":"boom"},{"type":"image","source":{}}]},{"type":"text","text":"<system-reminder>x</system-reminder>"}]}]}`)
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":true,"content":[{"type":"text","text":"boom"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"iVBORw0K"}}]},{"type":"text","text":"<system-reminder>x</system-reminder>"}]}]}`)
 	req, err := parseCursorClaudeRequest(body)
 	if err != nil {
 		t.Fatal(err)
@@ -16,7 +16,8 @@ func TestParseCursorClaudeRequest(t *testing.T) {
 		t.Fatalf("parsed = %+v", req)
 	}
 	res := req.toolResults()
-	if len(res) != 1 || res[0].ToolUseID != "toolu_1" || !res[0].IsError || res[0].Text != "boom\n[image omitted]" {
+	if len(res) != 1 || res[0].ToolUseID != "toolu_1" || !res[0].IsError || res[0].Text != "boom" ||
+		len(res[0].Images) != 1 || res[0].Images[0].MediaType != "image/png" || string(res[0].Images[0].Data) != "\x89PNG\r\n" {
 		t.Fatalf("tool results = %+v", res)
 	}
 	if req.lastUserText() != "<system-reminder>x</system-reminder>" {

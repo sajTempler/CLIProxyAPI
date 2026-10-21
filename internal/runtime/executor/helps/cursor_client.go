@@ -187,7 +187,7 @@ func (c *CursorClient) prepareRun(ctx context.Context, sess *cursorSession, req 
 	switch {
 	case continuing && len(results) > 0 && checkpoint != nil && len(sess.pending) > 0:
 		answers := map[string]cursorToolAnswer{}
-		byID := cursorResultsByID(results, creq.lastUserText())
+		byID := cursorResultsByID(results, creq.lastUserText(), creq.lastUserImageBlocks())
 		for _, p := range sess.pending {
 			if a, ok := byID[p.ToolUseID]; ok {
 				answers[p.fingerprint()] = a
@@ -197,7 +197,7 @@ func (c *CursorClient) prepareRun(ctx context.Context, sess *cursorSession, req 
 		action = &cursorpb.ConversationAction{Action: &cursorpb.ConversationAction_ResumeAction{ResumeAction: &cursorpb.ResumeAction{RequestContext: rctx.requestContext}}}
 		log.WithField("pending", len(sess.pending)).Info("cursor: held Run lost; resuming from checkpoint")
 	case continuing && len(results) == 0 && checkpoint != nil:
-		action = cursorUserAction(creq.lastUserText(), rctx.requestContext)
+		action = cursorUserAction(creq.lastUserText(), creq.lastUserImageBlocks(), rctx.requestContext)
 	default:
 		if n := len(creq.Messages); n > 1 {
 			log.WithField("messages", n).Debug("cursor: no usable state; seeding transcript")
@@ -209,7 +209,9 @@ func (c *CursorClient) prepareRun(ctx context.Context, sess *cursorSession, req 
 		if len(creq.Messages) > 1 {
 			text = cursorTranscript(creq.Messages)
 		}
-		action = cursorUserAction(text, rctx.requestContext)
+		// The last message's images ride along (tool_result images too, as the
+		// transcript inlines its results); earlier ones stay placeholders.
+		action = cursorUserAction(text, cursorMessageImages(creq.Messages[len(creq.Messages)-1]), rctx.requestContext)
 	}
 	sess.pending = nil
 
@@ -236,24 +238,42 @@ func (c *CursorClient) prepareRun(ctx context.Context, sess *cursorSession, req 
 	return startCursorRun(ctx, c.transport, sess, first, rctx, observer, c.Heartbeat)
 }
 
-func cursorUserAction(text string, rc *cursorpb.RequestContext) *cursorpb.ConversationAction {
+// cursorUserAction is a new user turn; images go inline as selected images,
+// as the agent CLI sends them.
+func cursorUserAction(text string, images []cursorImage, rc *cursorpb.RequestContext) *cursorpb.ConversationAction {
+	msg := &cursorpb.UserMessage{Text: text, MessageId: uuid.NewString(), Mode: cursorpb.AgentMode_AGENT_MODE_AGENT}
+	if len(images) > 0 {
+		selected := make([]*cursorpb.SelectedImage, 0, len(images))
+		for _, img := range images {
+			selected = append(selected, &cursorpb.SelectedImage{
+				DataOrBlobId: &cursorpb.SelectedImage_Data{Data: img.Data},
+				Uuid:         uuid.NewString(),
+				MimeType:     img.MediaType,
+			})
+		}
+		msg.SelectedContext = &cursorpb.SelectedContext{SelectedImages: selected}
+	}
 	return &cursorpb.ConversationAction{Action: &cursorpb.ConversationAction_UserMessageAction{UserMessageAction: &cursorpb.UserMessageAction{
-		UserMessage:    &cursorpb.UserMessage{Text: text, MessageId: uuid.NewString(), Mode: cursorpb.AgentMode_AGENT_MODE_AGENT},
+		UserMessage:    msg,
 		RequestContext: rc,
 	}}}
 }
 
-// cursorResultsByID maps tool_use ids to their results. Text the user message
-// carries next to the results (Claude Code system reminders) has no slot on a
-// held Run, so it rides along with the last result.
-func cursorResultsByID(results []cursorClaudeBlock, extra string) map[string]cursorToolAnswer {
+// cursorResultsByID maps tool_use ids to their results. Text and images the
+// user message carries next to the results (Claude Code system reminders, a
+// pasted image) have no slot on a held Run, so they ride along with the last
+// result.
+func cursorResultsByID(results []cursorClaudeBlock, extra string, extraImages []cursorImage) map[string]cursorToolAnswer {
 	out := make(map[string]cursorToolAnswer, len(results))
 	for i, r := range results {
-		text := r.Text
-		if i == len(results)-1 && extra != "" {
-			text += "\n\n" + extra
+		ans := cursorToolAnswer{text: r.Text, isError: r.IsError, images: r.Images}
+		if i == len(results)-1 {
+			if extra != "" {
+				ans.text += "\n\n" + extra
+			}
+			ans.images = append(append([]cursorImage(nil), ans.images...), extraImages...)
 		}
-		out[r.ToolUseID] = cursorToolAnswer{text: text, isError: r.IsError}
+		out[r.ToolUseID] = ans
 	}
 	return out
 }
@@ -262,13 +282,13 @@ func cursorResultsByID(results []cursorClaudeBlock, extra string) map[string]cur
 // with. A call without a matching tool_result gets an error result so the
 // server is never left waiting.
 func (c *CursorClient) answerPending(run *cursorLiveRun, sess *cursorSession, creq *cursorClaudeRequest, results []cursorClaudeBlock) error {
-	byID := cursorResultsByID(results, creq.lastUserText())
+	byID := cursorResultsByID(results, creq.lastUserText(), creq.lastUserImageBlocks())
 	for _, p := range sess.pending {
 		ans, ok := byID[p.ToolUseID]
 		if !ok {
 			ans = cursorToolAnswer{text: "No result was returned for this tool call.", isError: true}
 		}
-		if err := run.answerTool(p, ans.text, ans.isError); err != nil {
+		if err := run.answerTool(p, ans); err != nil {
 			return fmt.Errorf("cursor: send tool result: %w", err)
 		}
 	}

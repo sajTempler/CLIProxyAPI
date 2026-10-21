@@ -78,7 +78,7 @@ Practical picks:
 - Anthropic server tools (web search, code execution) do not exist on Cursor.
   Claude Code's WebSearch/WebFetch run their own model call on the session
   model; on a Cursor model expect them not to work.
-- Images: see "Images".
+- Images: forwarded, with limits (see "Images"). PDFs are not.
 - `cache_control` markers are ignored; Cursor caches on its own and reports
   cache reads/writes.
 - Prompt and output are billed against the Cursor plan (Team: included usage,
@@ -122,7 +122,18 @@ the summary.
 
 ## Images
 
-Not forwarded yet: image blocks reach Cursor as the text `[image omitted]`.
+Images are forwarded (png, jpeg, gif, webp, base64 as Claude Code sends them):
+- pasted images (user message image blocks) go inline as the Run's selected
+  images, as the agent CLI sends them;
+- images in tool results (Claude Code's Read on an image file) go back as MCP
+  image content.
+
+Verified live: composer-2.5 and gpt-5.4-mini-medium named the color of a
+pasted swatch, and gpt-5.4-mini-medium the color of one returned by a tool.
+Image URLs and other image types are answered with HTTP 400. After a proxy
+restart the transcript fallback keeps only the last message's images; earlier
+ones become `[image]`. PDF/document blocks cannot be forwarded: the model sees
+a note saying a document was attached and is not available.
 
 ## Mixed sessions
 

@@ -2,6 +2,7 @@ package helps
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -29,7 +30,19 @@ const (
 		"Follow the system instructions above; they override any other instructions about your identity, tools or output format."
 	// cursorSoftDenyReason is the error every built-in exec gets.
 	cursorSoftDenyReason = "This tool is not available in this environment. Use the `" + CursorMCPServer + "` MCP tools instead."
+	// cursorDocumentNote replaces document (PDF) blocks: Cursor's Run has no
+	// document input, so the model is told instead of the content vanishing.
+	cursorDocumentNote = "[A document (PDF) was attached here, but documents cannot be forwarded to this model. Tell the user if the task needs its content.]"
 )
+
+// cursorImageTypes are the image types Cursor accepts (agent CLI: "png, jpg, gif, or webp").
+var cursorImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
+
+// cursorImage is one decoded Claude image block.
+type cursorImage struct {
+	MediaType string
+	Data      []byte
+}
 
 // CursorRequestError is a Claude request the provider cannot map to a Run
 // (the executor answers it with HTTP 400).
@@ -67,6 +80,7 @@ type cursorClaudeBlock struct {
 	Input     json.RawMessage
 	ToolUseID string // tool_result target
 	IsError   bool
+	Images    []cursorImage // the image of an image block, or the images in a tool_result
 }
 
 // parseCursorClaudeRequest reads a Claude Messages request body.
@@ -116,6 +130,14 @@ func parseCursorClaudeRequest(body []byte) (*cursorClaudeRequest, error) {
 				blk.Text = b.Get("text").String()
 			case "thinking":
 				blk.Text = b.Get("thinking").String()
+			case "image":
+				img, errImg := cursorParseImage(b)
+				if errImg != nil {
+					return nil, errImg
+				}
+				blk.Images = []cursorImage{img}
+			case "document":
+				blk.Type, blk.Text = "text", cursorDocumentNote
 			case "tool_use":
 				blk.ID, blk.Name = b.Get("id").String(), b.Get("name").String()
 				blk.Input = json.RawMessage(`{}`)
@@ -125,7 +147,11 @@ func parseCursorClaudeRequest(body []byte) (*cursorClaudeRequest, error) {
 			case "tool_result":
 				blk.ToolUseID = b.Get("tool_use_id").String()
 				blk.IsError = b.Get("is_error").Bool()
-				blk.Text = cursorFlattenText(b.Get("content"))
+				text, images, errContent := cursorToolResultContent(b.Get("content"))
+				if errContent != nil {
+					return nil, errContent
+				}
+				blk.Text, blk.Images = text, images
 			}
 			msg.Blocks = append(msg.Blocks, blk)
 		}
@@ -154,8 +180,73 @@ func (r *cursorClaudeRequest) appendUserBlocks(blocks ...cursorClaudeBlock) {
 	r.Messages = append(r.Messages, cursorClaudeMessage{Role: "user", Blocks: blocks})
 }
 
+// cursorParseImage decodes a Claude image block. Only base64 sources map to
+// Cursor (inline image data); anything else is a request error (HTTP 400).
+func cursorParseImage(b gjson.Result) (cursorImage, error) {
+	src := b.Get("source")
+	if typ := src.Get("type").String(); typ != "base64" {
+		return cursorImage{}, &CursorRequestError{Msg: fmt.Sprintf("cursor: image source type %q is not supported; send images as base64", typ)}
+	}
+	mediaType := strings.ToLower(src.Get("media_type").String())
+	if !cursorImageTypes[mediaType] {
+		return cursorImage{}, &CursorRequestError{Msg: fmt.Sprintf("cursor: image type %q is not supported (png, jpeg, gif, webp)", mediaType)}
+	}
+	data, err := base64.StdEncoding.DecodeString(src.Get("data").String())
+	if err != nil || len(data) == 0 {
+		return cursorImage{}, &CursorRequestError{Msg: "cursor: image data is not valid base64"}
+	}
+	return cursorImage{MediaType: mediaType, Data: data}, nil
+}
+
+// cursorToolResultContent splits tool_result content into text and images
+// (Claude Code's Read returns images this way).
+func cursorToolResultContent(v gjson.Result) (string, []cursorImage, error) {
+	if !v.IsArray() {
+		return cursorFlattenText(v), nil, nil
+	}
+	var parts []string
+	var images []cursorImage
+	for _, b := range v.Array() {
+		switch b.Get("type").String() {
+		case "text":
+			parts = append(parts, b.Get("text").String())
+		case "image":
+			img, err := cursorParseImage(b)
+			if err != nil {
+				return "", nil, err
+			}
+			images = append(images, img)
+		case "document":
+			parts = append(parts, cursorDocumentNote)
+		}
+	}
+	return strings.Join(parts, "\n"), images, nil
+}
+
+// cursorMessageImages returns every image of a message: image blocks and
+// images inside tool_result blocks, in order.
+func cursorMessageImages(m cursorClaudeMessage) []cursorImage {
+	var out []cursorImage
+	for _, b := range m.Blocks {
+		out = append(out, b.Images...)
+	}
+	return out
+}
+
+// lastUserImageBlocks returns the images of the last message's image blocks
+// (not those inside tool results).
+func (r *cursorClaudeRequest) lastUserImageBlocks() []cursorImage {
+	var out []cursorImage
+	for _, b := range r.Messages[len(r.Messages)-1].Blocks {
+		if b.Type == "image" {
+			out = append(out, b.Images...)
+		}
+	}
+	return out
+}
+
 // cursorFlattenText turns a string or an array of content blocks into text.
-// Non-text blocks become short placeholders (images are not forwarded yet).
+// Non-text blocks become short placeholders (system text carries no images).
 func cursorFlattenText(v gjson.Result) string {
 	if !v.Exists() {
 		return ""
@@ -234,6 +325,8 @@ func cursorTranscript(msgs []cursorClaudeMessage) string {
 				if strings.TrimSpace(b.Text) != "" {
 					body.WriteString(b.Text + "\n")
 				}
+			case "image":
+				body.WriteString("[image]\n")
 			case "tool_use":
 				fmt.Fprintf(&body, "[tool call %s id=%s] %s\n", b.Name, b.ID, string(b.Input))
 			case "tool_result":
@@ -241,7 +334,11 @@ func cursorTranscript(msgs []cursorClaudeMessage) string {
 				if b.IsError {
 					status = " error"
 				}
-				fmt.Fprintf(&body, "<tool_result id=%s%s>\n%s\n</tool_result>\n", b.ToolUseID, status, b.Text)
+				text := b.Text
+				if n := len(b.Images); n > 0 {
+					text += fmt.Sprintf("\n[%d image(s)]", n)
+				}
+				fmt.Fprintf(&body, "<tool_result id=%s%s>\n%s\n</tool_result>\n", b.ToolUseID, status, text)
 			}
 		}
 		if body.Len() == 0 {

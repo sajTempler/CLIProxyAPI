@@ -112,6 +112,7 @@ type cursorRunContext struct {
 type cursorToolAnswer struct {
 	text    string
 	isError bool
+	images  []cursorImage
 }
 
 type cursorLiveRun struct {
@@ -234,17 +235,23 @@ func (r *cursorLiveRun) finishSend() {
 }
 
 // answerTool sends an mcp_result for a pending call.
-func (r *cursorLiveRun) answerTool(call *cursorToolCall, text string, isError bool) error {
-	return r.send(cursorMCPResult(call.ExecNum, call.ExecID, text, isError))
+func (r *cursorLiveRun) answerTool(call *cursorToolCall, ans cursorToolAnswer) error {
+	return r.send(cursorMCPResult(call.ExecNum, call.ExecID, ans))
 }
 
-func cursorMCPResult(id uint32, execID, text string, isError bool) *cursorpb.AgentClientMessage {
+// cursorMCPResult is the MCP result for a tool call: the text, then any
+// images as MCP image content.
+func cursorMCPResult(id uint32, execID string, ans cursorToolAnswer) *cursorpb.AgentClientMessage {
+	content := []*cursorpb.McpToolResultContentItem{{Content: &cursorpb.McpToolResultContentItem_Text{Text: &cursorpb.McpTextContent{Text: ans.text}}}}
+	for _, img := range ans.images {
+		content = append(content, &cursorpb.McpToolResultContentItem{Content: &cursorpb.McpToolResultContentItem_Image{Image: &cursorpb.McpImageContent{Data: img.Data, MimeType: img.MediaType}}})
+	}
 	return &cursorpb.AgentClientMessage{Message: &cursorpb.AgentClientMessage_ExecClientMessage{ExecClientMessage: &cursorpb.ExecClientMessage{
 		Id:     id,
 		ExecId: execID,
 		Message: &cursorpb.ExecClientMessage_McpResult{McpResult: &cursorpb.McpResult{Result: &cursorpb.McpResult_Success{Success: &cursorpb.McpSuccess{
-			Content: []*cursorpb.McpToolResultContentItem{{Content: &cursorpb.McpToolResultContentItem_Text{Text: &cursorpb.McpTextContent{Text: text}}}},
-			IsError: isError,
+			Content: content,
+			IsError: ans.isError,
 		}}}},
 	}}}
 }
@@ -351,7 +358,7 @@ func (r *cursorLiveRun) handleExec(e *cursorpb.ExecServerMessage) error {
 			r.ctxMu.Lock()
 			delete(r.rctx.resumeAnswers, call.fingerprint())
 			r.ctxMu.Unlock()
-			return r.answerTool(call, ans.text, ans.isError)
+			return r.answerTool(call, ans)
 		}
 		r.events.push(cursorRunEvent{kind: cursorEvToolCall, call: call})
 		return nil
