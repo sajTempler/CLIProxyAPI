@@ -158,6 +158,7 @@ func TestCursorExecutorErrorBeforeOutputIsStatus(t *testing.T) {
 		{&helps.CursorStatusError{Code: "invalid_argument"}, http.StatusBadRequest, false},
 		{&helps.CursorStatusError{Code: "internal"}, http.StatusBadGateway, false},
 		{errors.New("dial failed"), http.StatusBadGateway, false},
+		{&helps.CursorRequestError{Msg: "cursor: request has no messages"}, http.StatusBadRequest, false},
 	}
 	for _, tc := range cases {
 		f := &cursorFakeStream{err: tc.err}

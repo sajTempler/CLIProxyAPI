@@ -374,6 +374,10 @@ func cursorStatusErr(err error) error {
 	if errors.As(err, &already) {
 		return err
 	}
+	var reqErr *helps.CursorRequestError
+	if errors.As(err, &reqErr) {
+		return statusErr{code: http.StatusBadRequest, msg: reqErr.Error()}
+	}
 	var se *helps.CursorStatusError
 	if !errors.As(err, &se) {
 		return statusErr{code: http.StatusBadGateway, msg: err.Error()}

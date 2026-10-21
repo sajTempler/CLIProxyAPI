@@ -31,6 +31,12 @@ const (
 	cursorSoftDenyReason = "This tool is not available in this environment. Use the `" + CursorMCPServer + "` MCP tools instead."
 )
 
+// CursorRequestError is a Claude request the provider cannot map to a Run
+// (the executor answers it with HTTP 400).
+type CursorRequestError struct{ Msg string }
+
+func (e *CursorRequestError) Error() string { return e.Msg }
+
 // cursorClaudeRequest is the subset of a Claude Messages request the provider uses.
 type cursorClaudeRequest struct {
 	System   string
@@ -66,7 +72,7 @@ type cursorClaudeBlock struct {
 // parseCursorClaudeRequest reads a Claude Messages request body.
 func parseCursorClaudeRequest(body []byte) (*cursorClaudeRequest, error) {
 	if !gjson.ValidBytes(body) {
-		return nil, fmt.Errorf("cursor: request body is not valid JSON")
+		return nil, &CursorRequestError{Msg: "cursor: request body is not valid JSON"}
 	}
 	root := gjson.ParseBytes(body)
 	req := &cursorClaudeRequest{System: cursorFlattenText(root.Get("system"))}
@@ -88,6 +94,15 @@ func parseCursorClaudeRequest(body []byte) (*cursorClaudeRequest, error) {
 	for _, m := range root.Get("messages").Array() {
 		msg := cursorClaudeMessage{Role: m.Get("role").String()}
 		content := m.Get("content")
+		if msg.Role == "system" {
+			// Claude Code sends mid-conversation system messages (reminders,
+			// context updates). Cursor has no such turn: they ride as text on
+			// the adjacent user turn.
+			if text := strings.TrimSpace(cursorFlattenText(content)); text != "" {
+				req.appendUserBlocks(cursorClaudeBlock{Type: "text", Text: "<system_message>\n" + text + "\n</system_message>"})
+			}
+			continue
+		}
 		var blocks []gjson.Result
 		if content.Type == gjson.String {
 			msg.Blocks = append(msg.Blocks, cursorClaudeBlock{Type: "text", Text: content.String()})
@@ -114,15 +129,29 @@ func parseCursorClaudeRequest(body []byte) (*cursorClaudeRequest, error) {
 			}
 			msg.Blocks = append(msg.Blocks, blk)
 		}
+		if msg.Role == "user" {
+			req.appendUserBlocks(msg.Blocks...)
+			continue
+		}
 		req.Messages = append(req.Messages, msg)
 	}
 	if len(req.Messages) == 0 {
-		return nil, fmt.Errorf("cursor: request has no messages")
+		return nil, &CursorRequestError{Msg: "cursor: request has no messages"}
 	}
 	if last := req.Messages[len(req.Messages)-1]; last.Role != "user" {
-		return nil, fmt.Errorf("cursor: last message must be from the user, got %q", last.Role)
+		return nil, &CursorRequestError{Msg: fmt.Sprintf("cursor: last message must be from the user, got %q", last.Role)}
 	}
 	return req, nil
+}
+
+// appendUserBlocks adds blocks to the trailing user message, or starts one.
+// Consecutive user turns merge, as the Messages API itself treats them.
+func (r *cursorClaudeRequest) appendUserBlocks(blocks ...cursorClaudeBlock) {
+	if n := len(r.Messages); n > 0 && r.Messages[n-1].Role == "user" {
+		r.Messages[n-1].Blocks = append(r.Messages[n-1].Blocks, blocks...)
+		return
+	}
+	r.Messages = append(r.Messages, cursorClaudeMessage{Role: "user", Blocks: blocks})
 }
 
 // cursorFlattenText turns a string or an array of content blocks into text.

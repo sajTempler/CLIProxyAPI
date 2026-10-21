@@ -47,3 +47,21 @@ func TestCursorClaudeIdentity(t *testing.T) {
 		t.Fatalf("identities: %s %s %s", a, b, c)
 	}
 }
+
+func TestParseCursorClaudeRequestFoldsSystemMessages(t *testing.T) {
+	body := []byte(`{"messages":[{"role":"system","content":"early note"},{"role":"user","content":"hello"},
+		{"role":"assistant","content":"hi"},{"role":"user","content":"do it"},{"role":"system","content":[{"type":"text","text":"reminder"}]}]}`)
+	req, err := parseCursorClaudeRequest(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(req.Messages) != 3 || req.Messages[0].Role != "user" || req.Messages[2].Role != "user" {
+		t.Fatalf("messages = %+v", req.Messages)
+	}
+	if got := req.lastUserText(); got != "do it\n\n<system_message>\nreminder\n</system_message>" {
+		t.Fatalf("last user text = %q", got)
+	}
+	if got := textOf(req.Messages[0]); got != "<system_message>\nearly note\n</system_message>\n\nhello" {
+		t.Fatalf("first user text = %q", got)
+	}
+}
