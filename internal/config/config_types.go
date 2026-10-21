@@ -422,6 +422,9 @@ type RoutingConfig struct {
 	// ClaudeQuota configures Claude quota tracking used by the "soonest-reset" strategy.
 	ClaudeQuota ClaudeQuotaConfig `yaml:"claude-quota,omitempty" json:"claude-quota,omitempty"`
 
+	// CursorQuota configures Cursor usage tracking (display only, no routing effect).
+	CursorQuota CursorQuotaConfig `yaml:"cursor-quota,omitempty" json:"cursor-quota,omitempty"`
+
 	// SessionAffinity enables universal session-sticky routing for all clients.
 	// Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,
 	// followed by prompt_cache_key, Responses conversation IDs, legacy body IDs,

@@ -50,6 +50,8 @@ func (s *Server) registerManagementV8Routes() {
 	v8.POST("/credentials/refresh", s.mgmt.RefreshAuthFiles)
 	v8.GET("/quota/claude", s.mgmt.GetClaudeQuota)
 	v8.POST("/quota/claude/refresh", s.mgmt.RefreshClaudeQuota)
+	v8.GET("/quota/cursor", s.mgmt.GetCursorQuota)
+	v8.POST("/quota/cursor/refresh", s.mgmt.RefreshCursorQuota)
 	v8.POST("/oauth/import", s.mgmt.ImportOAuthV8)
 	v8.GET("/oauth/auth-url", s.mgmt.StartOAuthV8)
 	v8.POST("/oauth/siwc/bind", s.mgmt.StartSIWCBind)

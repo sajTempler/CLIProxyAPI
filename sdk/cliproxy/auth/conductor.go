@@ -205,6 +205,8 @@ type Manager struct {
 	homeInFlightPublisherConfig atomic.Pointer[HomeInFlightPublisherConfig]
 	// claudeQuota merges Claude 5h/7d quota windows for soonest-reset routing (claude_quota.go).
 	claudeQuota atomic.Pointer[ClaudeQuotaTracker]
+	// cursorQuota holds polled Cursor usage for display (cursor_quota.go).
+	cursorQuota atomic.Pointer[CursorQuotaTracker]
 
 	// Retry controls request retry behavior.
 	requestRetry        atomic.Int32

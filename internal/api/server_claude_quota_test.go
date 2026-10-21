@@ -26,6 +26,7 @@ func TestManagementV8ClaudeQuotaRoutes(t *testing.T) {
 	cfg.AuthDir = t.TempDir()
 	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetClaudeQuotaTracker(coreauth.NewClaudeQuotaTracker())
+	manager.SetCursorQuotaTracker(coreauth.NewCursorQuotaTracker())
 	h := management.NewHandler(cfg, path, manager)
 	h.SetLocalPassword("test-password")
 	s := &Server{cfg: cfg, engine: gin.New(), mgmt: h}
@@ -41,6 +42,10 @@ func TestManagementV8ClaudeQuotaRoutes(t *testing.T) {
 		{http.MethodGet, "/v8/management/quota/claude", false, http.StatusUnauthorized},
 		{http.MethodPost, "/v8/management/quota/claude/refresh", true, http.StatusServiceUnavailable},
 		{http.MethodGet, "/v0/management/quota/claude", true, http.StatusNotFound},
+		{http.MethodGet, "/v8/management/quota/cursor", true, http.StatusOK},
+		{http.MethodGet, "/v8/management/quota/cursor", false, http.StatusUnauthorized},
+		{http.MethodPost, "/v8/management/quota/cursor/refresh", true, http.StatusServiceUnavailable},
+		{http.MethodGet, "/v0/management/quota/cursor", true, http.StatusNotFound},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		req.RemoteAddr = "127.0.0.1:1234"

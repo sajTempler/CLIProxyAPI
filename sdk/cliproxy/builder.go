@@ -268,6 +268,7 @@ func (b *Builder) Build() (*Service, error) {
 		appliedRoutingState = &routingState
 	}
 	ensureClaudeQuotaTracker(coreManager)
+	ensureCursorQuotaTracker(coreManager)
 	// Attach a default RoundTripper provider so providers can opt-in per-auth transports.
 	coreManager.SetRoundTripperProvider(newDefaultRoundTripperProvider())
 	coreManager.SetConfig(b.cfg)

@@ -1,0 +1,265 @@
+{
+  "format": "cursor-run-fixture/v1",
+  "agent_version": "2026.10.19-6bbf2c4",
+  "model": "composer-2.5",
+  "source": "reconstructed",
+  "description": "Held-open Run with two sequential MCP calls (lookup_secret alpha, then beta) each answered with mcp_result before the final text.",
+  "notes": "Reconstructed from the Phase 0 spike summary (temp/cursor-spike/out/10-resume-B-composer-2.5.json); the spike kept no frame bytes. Event order, exec types, tool names/args, tool results and token counts are from the run; text/thinking deltas are condensed, ids are placeholders, and checkpoint/KV/token_delta traffic is omitted. Replace with a recorded fixture once the Phase 2 wire client can record. The original Run was a resume_action; here it starts with a fresh user_message_action.",
+  "frames": [
+    {
+      "dir": "client",
+      "at_ms": 0,
+      "msg": {
+        "run_request": {
+          "conversation_state": {},
+          "action": {
+            "user_message_action": {
+              "user_message": {
+                "text": "Use the lookup_secret tool to get the secret for key 'alpha' and tell me the value.",
+                "message_id": "00000000-0000-4000-8000-000000000002",
+                "mode": "AGENT_MODE_AGENT"
+              },
+              "request_context": {
+                "rules": [
+                  {
+                    "full_path": "Claude Code system instructions",
+                    "content": "Cursor built-in tools (shell, read, write, grep, ls, edit, etc.) are disabled in this environment and always fail. The only working tools are the MCP tools of the `claude-code` server; call them via the dynamic tool mechanism.",
+                    "type": {
+                      "global": {}
+                    }
+                  }
+                ],
+                "env": {
+                  "os_version": "darwin 25.0.0",
+                  "workspace_paths": [
+                    "/Users/user/private/CLIProxyAPI/temp/cursor-spike/ws"
+                  ],
+                  "shell": "zsh",
+                  "time_zone": "Europe/Warsaw",
+                  "process_working_directory": "/Users/user/private/CLIProxyAPI/temp/cursor-spike/ws"
+                },
+                "web_search_enabled": false,
+                "web_fetch_enabled": false,
+                "mcp_meta_tool_options": {
+                  "enabled": true,
+                  "mcp_descriptors": [
+                    {
+                      "server_name": "claude-code",
+                      "server_identifier": "claude-code",
+                      "tools": [
+                        {
+                          "tool_name": "lookup_secret",
+                          "description": "Look up the secret value stored in the vault for a key. Returns the value as text.",
+                          "input_schema": {
+                            "properties": {
+                              "key": {
+                                "description": "Vault key",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        {
+                          "tool_name": "Read",
+                          "description": "Reads a file from the local filesystem. The file_path parameter must be an absolute path.",
+                          "input_schema": {
+                            "properties": {
+                              "file_path": {
+                                "type": "string"
+                              },
+                              "limit": {
+                                "type": "number"
+                              },
+                              "offset": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "file_path"
+                            ],
+                            "type": "object"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "requested_model": {
+            "model_id": "composer-2.5"
+          },
+          "mcp_tools": {},
+          "conversation_id": "00000000-0000-4000-8000-000000000001",
+          "conversation_group_id": "00000000-0000-4000-8000-000000000001",
+          "run_id": "00000000-0000-4000-8000-000000000002"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 104,
+      "msg": {
+        "interaction_update": {
+          "heartbeat": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 104,
+      "msg": {
+        "interaction_update": {
+          "tool_call_started": {
+            "call_id": "tool_f5060ca2-41e8-4f89-918a-4ece3b2e64f",
+            "tool_call": {
+              "mcp_tool_call": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1552,
+      "msg": {
+        "exec_server_message": {
+          "id": 1,
+          "exec_id": "exec-1",
+          "mcp_args": {
+            "name": "claude-code-lookup_secret",
+            "args": {
+              "key": "alpha"
+            },
+            "tool_call_id": "tool_f5060ca2-41e8-4f89-918a-4ece3b2e64f",
+            "provider_identifier": "claude-code",
+            "tool_name": "lookup_secret"
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 1552,
+      "msg": {
+        "exec_client_message": {
+          "id": 1,
+          "exec_id": "exec-1",
+          "mcp_result": {
+            "success": {
+              "content": [
+                {
+                  "text": {
+                    "text": "No value stored under 'alpha'. 'alpha' is an alias: look up key 'beta' instead."
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1552,
+      "msg": {
+        "interaction_update": {
+          "text_delta": {
+            "text": "`alpha` is an alias; looking up `beta` for the actual value.\n"
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1552,
+      "msg": {
+        "interaction_update": {
+          "tool_call_started": {
+            "call_id": "tool_5cb1342c-f8f8-4edb-8352-048c0d01319",
+            "tool_call": {
+              "mcp_tool_call": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 2996,
+      "msg": {
+        "exec_server_message": {
+          "id": 2,
+          "exec_id": "exec-2",
+          "mcp_args": {
+            "name": "claude-code-lookup_secret",
+            "args": {
+              "key": "beta"
+            },
+            "tool_call_id": "tool_5cb1342c-f8f8-4edb-8352-048c0d01319",
+            "provider_identifier": "claude-code",
+            "tool_name": "lookup_secret"
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 2996,
+      "msg": {
+        "exec_client_message": {
+          "id": 2,
+          "exec_id": "exec-2",
+          "mcp_result": {
+            "success": {
+              "content": [
+                {
+                  "text": {
+                    "text": "PURPLE-42"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 2996,
+      "msg": {
+        "interaction_update": {
+          "text_delta": {
+            "text": "The value stored under **`beta`** (alias target of `alpha`) is **`PURPLE-42`**."
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 2996,
+      "msg": {
+        "conversation_checkpoint_update": {}
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 4299,
+      "msg": {
+        "interaction_update": {
+          "turn_ended": {
+            "input_tokens": "26112",
+            "output_tokens": "327",
+            "cache_read_tokens": "21184",
+            "reasoning_tokens": "0"
+          }
+        }
+      }
+    }
+  ]
+}

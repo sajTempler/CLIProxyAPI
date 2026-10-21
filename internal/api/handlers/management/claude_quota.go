@@ -315,7 +315,7 @@ func (h *Handler) RefreshClaudeQuota(c *gin.Context) {
 		}
 		auths = []*coreauth.Auth{target}
 	} else {
-		refreshClaudeQuotaAll(c.Request.Context(), refresher, auths)
+		refreshQuotaAll(c.Request.Context(), refresher, auths)
 	}
 	_, rankCfg, _ := h.claudeQuotaSettings()
 	// Rank against every credential, then return only the refreshed ones.
@@ -334,7 +334,14 @@ func (h *Handler) RefreshClaudeQuota(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"credentials": out})
 }
 
-func refreshClaudeQuotaAll(ctx context.Context, refresher coreauth.ClaudeQuotaRefresher, auths []*coreauth.Auth) {
+// quotaRefresher is the part of a provider usage poller the refresh endpoints need.
+type quotaRefresher interface {
+	Refresh(ctx context.Context, authID string) error
+}
+
+// refreshQuotaAll refreshes every enabled credential concurrently. Per-credential
+// failures (backoff, 401) are reported through each credential's poll_error.
+func refreshQuotaAll(ctx context.Context, refresher quotaRefresher, auths []*coreauth.Auth) {
 	var wg sync.WaitGroup
 	for _, auth := range auths {
 		if auth.Disabled || auth.Status == coreauth.StatusDisabled {
