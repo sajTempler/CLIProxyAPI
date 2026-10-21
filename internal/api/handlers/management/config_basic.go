@@ -319,7 +319,7 @@ func normalizeRoutingStrategy(strategy string) (string, bool) {
 	case "fill-first", "fillfirst", "ff":
 		return "fill-first", true
 	default:
-		return "", false
+		return config.NormalizeSoonestResetStrategy(normalized)
 	}
 }
 

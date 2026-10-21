@@ -37,3 +37,10 @@ date, phase, what changed (commit SHAs), what's next, blockers. Newest at the bo
   - Sanitized fixtures in `sdk/cliproxy/auth/testdata/` (live usage payload, `fable 5` + null reset variant, Fable and Opus header sets).
   - Tests: `go test ./sdk/cliproxy/auth` green. Pre-existing: `gofmt -l` flags upstream `internal/pluginhost/host.go` (left untouched).
   - Next: phase 2 (selector + config).
+- 2026-10-21 (phase 2, commit "feat(quota-routing): add soonest-reset routing strategy and claude-quota config"):
+  - New `sdk/cliproxy/auth/selector_soonest_reset.go`: `RankClaudeQuota` (SPEC section 3) + `SoonestResetSelector` (custom selector, not in `isBuiltInSelector`/`selectorStrategy`). Clock = tracker clock unless overridden.
+  - Interpretation: skipped accounts are ordered by their unblock time = the latest reset among their blocking windows (an account blocked on 5h and 7d is usable only after both reset).
+  - Config: `routing.strategy: soonest-reset` (aliases `soonestreset`, `sr`), `routing.claude-quota.refresh-interval`, `routing.claude-quota.skip-five-hour-at` (type + helpers in new `internal/config/claude_quota.go`; one field added to `RoutingConfig`). Documented in `config.example.yaml`.
+  - Wiring: `sdk/cliproxy/service_claude_quota.go` (new); one-line hooks in `service_config.go` (state fields, strategy case, tracker attach) and `builder.go` (tracker created before the manager); management `normalizeRoutingStrategy` falls through to `config.NormalizeSoonestResetStrategy`.
+  - Tests: ordering/fallback keys, 5h threshold + rejected, weekly 100 %, Fable-only skip, unknown + `RequestPoll`, all-skipped, expiry with fake clock, tie window + each tie-break, mixed non-Claude, cooldown filter + `modelCooldownError`, config interval/threshold/round-trip, alias normalize. Green.
+  - Next: phase 3 (affinity composition).

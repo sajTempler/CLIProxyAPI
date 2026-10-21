@@ -395,6 +395,14 @@ func (t *ClaudeQuotaTracker) Snapshot(authID string) (ClaudeQuotaSnapshot, bool)
 	if t == nil {
 		return ClaudeQuotaSnapshot{}, false
 	}
+	return t.snapshotAt(authID, t.Now())
+}
+
+// snapshotAt is Snapshot evaluated at an explicit time instead of the tracker clock.
+func (t *ClaudeQuotaTracker) snapshotAt(authID string, now time.Time) (ClaudeQuotaSnapshot, bool) {
+	if t == nil {
+		return ClaudeQuotaSnapshot{}, false
+	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	entry := t.byAuth[strings.TrimSpace(authID)]
@@ -402,7 +410,6 @@ func (t *ClaudeQuotaTracker) Snapshot(authID string) (ClaudeQuotaSnapshot, bool)
 		return ClaudeQuotaSnapshot{}, false
 	}
 	out := entry.clone()
-	now := t.now()
 	for name, window := range out.Windows {
 		out.Windows[name] = window.effective(now)
 	}

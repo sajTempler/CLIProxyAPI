@@ -262,9 +262,12 @@ func (b *Builder) Build() (*Service, error) {
 		}
 
 		routingState := normalizedRoutingRuntimeState(b.cfg)
+		routingState.claudeQuota = coreauth.NewClaudeQuotaTracker()
 		coreManager = coreauth.NewManager(tokenStore, newRoutingSelector(routingState), nil)
+		coreManager.SetClaudeQuotaTracker(routingState.claudeQuota)
 		appliedRoutingState = &routingState
 	}
+	ensureClaudeQuotaTracker(coreManager)
 	// Attach a default RoundTripper provider so providers can opt-in per-auth transports.
 	coreManager.SetRoundTripperProvider(newDefaultRoundTripperProvider())
 	coreManager.SetConfig(b.cfg)
