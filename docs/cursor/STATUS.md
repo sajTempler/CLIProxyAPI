@@ -1,6 +1,6 @@
 # Cursor provider: status log
 
-Single source of truth for progress on `feat/cursor-provider`. Plan: `PLAN.md`.
+Single source of truth for Cursor provider progress (all work lands on `main`). Plan: `PLAN.md`.
 Each agent appends one entry when it finishes a unit of work: date, phase,
 what changed (commit SHAs), what's next, blockers. Newest at the bottom.
 
@@ -8,11 +8,11 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
 
 - Running proxy: LaunchAgent `com.szymon.cliproxyapi`, `127.0.0.1:8317`, config `config.yaml`, keys in `.env` (`CPA_API_KEY`, `MANAGEMENT_PASSWORD`). Never print key values.
 - Proxy logs: `logs/launchd.out.log`, `logs/launchd.err.log`.
-- Redeploy after changes: `go build -o cli-proxy-api ./cmd/server && launchctl kickstart -k gui/$(id -u)/com.szymon.cliproxyapi`.
+- Redeploy after changes: `scripts/deploy-local.sh` (main checkout only; single kickstart, keeps a rollback binary). Never bootout/bootstrap the LaunchAgent.
 - Claude auth file: `~/.cli-proxy-api/claude-*.json`. Cursor token: macOS keychain, service `cursor-access-token`, account `cursor-user`. Never print token values.
 - Installed agent CLI: `~/.local/bin/agent` → `~/.local/share/cursor-agent/versions/<ver>/`.
 - Upstream remote: `upstream` (router-for-me/CLIProxyAPI). Keep the provider isolated (Devin pattern) to keep upstream merges cheap.
-- Throwaway work goes under `temp/` (gitignored).
+- Throwaway work goes under `temp/` (gitignored). All work is committed on `main` and pushed to origin (sajTempler/CLIProxyAPI); no long-lived branches or worktrees.
 
 ## Log
 
@@ -85,3 +85,4 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
     - Images are dropped (`[image omitted]`).
     - Not tested live: new user text while a Run is held (`cancel_action` path) and holds lasting minutes.
     - Thinking signatures are left for Phase 6.
+- 2026-10-21: folded all branches (quota-routing, cursor-usage, cursor-auth, cursor-provider incl. Phase 2, deploy script) into `main`, pushed, deployed `main`; removed all worktrees. Full suite: only the 2 pre-existing failures (codex/live WebRTC, discovery mDNS); fixed the no-copy invariant for the Connect frame (`11af5204`). Next: Phase 4 executor.

@@ -1,7 +1,6 @@
 # Quota routing: status log
 
-Single source of truth for progress on `feat/quota-routing` (worktree
-`/Users/szymon/private/CLIProxyAPI/.worktrees/quota-routing`). Requirements: `SOURCE.md`.
+Single source of truth for quota-routing progress (merged to `main`; deployed). Requirements: `SOURCE.md`.
 Spec and phase plan: `SPEC.md`. Each agent appends one entry when it finishes a unit of work:
 date, phase, what changed (commit SHAs), what's next, blockers. Newest at the bottom.
 
