@@ -34,7 +34,8 @@ Send no `anthropic-version` header when listing: for clients that send it
 `claude-fable-5-dd-<id reversed>`. `/v1/messages` accepts both spellings.
 
 The list is the account's live `GetUsableModels` catalog (about 265 ids on the
-Team plan), refreshed in the background. Until the first fetch succeeds the
+Team plan). The proxy fetches it when a Cursor login registers and
+re-fetches it every ~6 h on a timer (failures back off from 10 min to 1 h). Until the first fetch succeeds the
 proxy serves a 9-model static fallback. Ids encode the reasoning level
 (`-low`, `-medium`, `-high`, `-xhigh`, `-max`), a `-thinking` variant and a
 `-fast` (priority) variant. Cursor picks the reasoning level from the id;

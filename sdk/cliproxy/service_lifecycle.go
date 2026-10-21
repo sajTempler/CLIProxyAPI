@@ -103,6 +103,7 @@ func (s *Service) Run(ctx context.Context) error {
 		log.Infof("core auth auto-refresh started (interval=%s)", interval)
 		s.startClaudeQuotaPoller(ctx)
 		s.startCursorQuotaPoller(ctx)
+		s.startCursorModelsRefresher(ctx)
 	}
 
 	if !homeEnabled {
