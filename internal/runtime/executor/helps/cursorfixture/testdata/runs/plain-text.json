@@ -1,0 +1,661 @@
+{
+  "format": "cursor-run-fixture/v1",
+  "agent_version": "2026.10.19-6bbf2c4",
+  "model": "composer-2.5",
+  "source": "recorded",
+  "description": "Plain text answer, no tool use (tools offered).",
+  "frames": [
+    {
+      "dir": "client",
+      "at_ms": 3,
+      "msg": {
+        "run_request": {
+          "conversation_state": {},
+          "action": {
+            "user_message_action": {
+              "user_message": {
+                "text": "Reply with one short sentence: what is 2+2?",
+                "message_id": "a3a9a7f2-4208-4dac-9e2e-5e45d7472fe8",
+                "mode": "AGENT_MODE_AGENT"
+              },
+              "request_context": {
+                "rules": [
+                  {
+                    "full_path": "Claude Code system instructions",
+                    "content": "You are Claude Code, Anthropic's official CLI for Claude. Be concise.\n\n\u003cenv\u003e\nWorking directory: /tmp/cursor-live-ws\nPlatform: darwin\n\u003c/env\u003e\n\nCursor built-in tools (shell, read, write, edit, grep, glob, ls, delete, fetch, web search, subagents, etc.) are disabled in this environment and always fail. The only working tools are the MCP tools of the `claude-code` server; call them via the dynamic tool mechanism with exactly the argument names of their input schema. Follow the system instructions above; they override any other instructions about your identity, tools or output format.",
+                    "type": {
+                      "global": {}
+                    }
+                  }
+                ],
+                "env": {
+                  "workspace_paths": [
+                    "/tmp/cursor-live-ws"
+                  ],
+                  "process_working_directory": "/tmp/cursor-live-ws"
+                },
+                "web_search_enabled": false,
+                "mcp_file_system_options": {
+                  "enabled": true,
+                  "workspace_project_dir": "/tmp/cursor-live-ws"
+                },
+                "web_fetch_enabled": false,
+                "git_repo_info_complete": true,
+                "mcp_meta_tool_options": {
+                  "enabled": true,
+                  "mcp_descriptors": [
+                    {
+                      "server_name": "claude-code",
+                      "server_identifier": "claude-code",
+                      "tools": [
+                        {
+                          "tool_name": "lookup_secret",
+                          "description": "Look up the secret value stored in the vault for a key. Returns the value as text.",
+                          "input_schema": {
+                            "properties": {
+                              "key": {
+                                "description": "Vault key",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        {
+                          "tool_name": "Read",
+                          "description": "Reads a file from the local filesystem. The file_path parameter must be an absolute path.",
+                          "input_schema": {
+                            "properties": {
+                              "file_path": {
+                                "description": "The absolute path to the file to read",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "file_path"
+                            ],
+                            "type": "object"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "mcp_info_complete": true,
+                "rules_info_complete": true,
+                "env_info_complete": true,
+                "repository_info_complete": true,
+                "custom_subagents_info_complete": true,
+                "mcp_file_system_info_complete": true
+              }
+            }
+          },
+          "requested_model": {
+            "model_id": "composer-2.5"
+          },
+          "mcp_tools": {},
+          "conversation_id": "3ca963dc-e92e-46f3-9860-8c9460cef52b",
+          "conversation_group_id": "3ca963dc-e92e-46f3-9860-8c9460cef52b",
+          "run_id": "7039bd17-b7aa-41ce-a822-49ed3e8b0546"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 133,
+      "msg": {
+        "interaction_update": {
+          "heartbeat": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 430,
+      "msg": {
+        "kv_server_message": {
+          "set_blob_args": {
+            "blob_id": "PKMKKrQzvZoP/MmEzrGj93OBWlTJCSQlrvn/zZoshDs=",
+            "blob_data": "W2VsaWRlZCAyNDI1IGJ5dGVzXQ=="
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "325ddabd1affda72",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 430,
+      "msg": {
+        "kv_client_message": {
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 443,
+      "msg": {
+        "kv_server_message": {
+          "id": 1,
+          "set_blob_args": {
+            "blob_id": "Hv1J0RAeEC9uuAUCSnShTFj3nH1gx9pw6+91Rl51iXY=",
+            "blob_data": "W2VsaWRlZCAyMDk5MiBieXRlc10="
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "325ddabd1affda72",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 443,
+      "msg": {
+        "kv_client_message": {
+          "id": 1,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 443,
+      "msg": {
+        "kv_server_message": {
+          "id": 2,
+          "set_blob_args": {
+            "blob_id": "xqSLbXk+UlYss5Cf3H/fnHLJhxtg7DVRP2DtVa1+S8w=",
+            "blob_data": "W2VsaWRlZCA5MyBieXRlc10="
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "b8581dbdedd3343a",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 443,
+      "msg": {
+        "kv_client_message": {
+          "id": 2,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 443,
+      "msg": {
+        "kv_server_message": {
+          "id": 3,
+          "set_blob_args": {
+            "blob_id": "uoJJLDa0eMZhKp7QLgVIxxm5zKPoJfkSTLRH5xqVwz0=",
+            "blob_data": "W2VsaWRlZCAxNzYgYnl0ZXNd"
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "2673c52f9a3fbbad",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 443,
+      "msg": {
+        "kv_client_message": {
+          "id": 3,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "thinking_delta": {
+            "text": "The",
+            "thinking_style": "THINKING_STYLE_DEFAULT"
+          },
+          "message_started_at_ms": "1792577344238"
+        },
+        "ttft_breakdown": {
+          "server_first_token_ms": 1395.3744469999801,
+          "pre_stream_setup_ms": 292.23792899993714,
+          "wait_for_first_event_ms": 1.0356150000588968,
+          "provider_ttft_ms": 282.07861099997535
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "thinking_delta": {
+            "text": " user wants to know ",
+            "thinking_style": "THINKING_STYLE_DEFAULT"
+          },
+          "message_started_at_ms": "1792577344238"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "token_delta": {
+            "tokens": 5
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "thinking_delta": {
+            "text": "the",
+            "thinking_style": "THINKING_STYLE_DEFAULT"
+          },
+          "message_started_at_ms": "1792577344238"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "token_delta": {
+            "tokens": 1
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "thinking_delta": {
+            "text": " result of 2 plus 2.",
+            "thinking_style": "THINKING_STYLE_DEFAULT"
+          },
+          "message_started_at_ms": "1792577344238"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "token_delta": {
+            "tokens": 5
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "thinking_completed": {
+            "thinking_duration_ms": 1
+          },
+          "message_started_at_ms": "1792577344238"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1523,
+      "msg": {
+        "interaction_update": {
+          "text_delta": {
+            "text": "2"
+          },
+          "message_started_at_ms": "1792577344240"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1524,
+      "msg": {
+        "interaction_update": {
+          "text_delta": {
+            "text": "+2 is"
+          },
+          "message_started_at_ms": "1792577344240"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1524,
+      "msg": {
+        "interaction_update": {
+          "token_delta": {
+            "tokens": 2
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1531,
+      "msg": {
+        "interaction_update": {
+          "text_delta": {
+            "text": " 4."
+          },
+          "message_started_at_ms": "1792577344240"
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1549,
+      "msg": {
+        "kv_server_message": {
+          "id": 4,
+          "set_blob_args": {
+            "blob_id": "FJD0gqpw/B0I8PggGdGLZPQD2QBwJJdIYgWuEupyRBU=",
+            "blob_data": "W2VsaWRlZCAyNzEgYnl0ZXNd"
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "d66245a9cadfadd5",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 1549,
+      "msg": {
+        "kv_client_message": {
+          "id": 4,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1550,
+      "msg": {
+        "kv_server_message": {
+          "id": 5,
+          "set_blob_args": {
+            "blob_id": "InunPFicp8+XK2IaPH3JT+x8qeRj0XkH2FOoaMjD9mw=",
+            "blob_data": "W2VsaWRlZCA2NiBieXRlc10="
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "d66245a9cadfadd5",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 1550,
+      "msg": {
+        "kv_client_message": {
+          "id": 5,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1550,
+      "msg": {
+        "kv_server_message": {
+          "id": 6,
+          "set_blob_args": {
+            "blob_id": "/Px4OdzRT6ax6K133jbEjgOODTrrJgtlImqt6QtN2p4=",
+            "blob_data": "W2VsaWRlZCAyMCBieXRlc10="
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "d66245a9cadfadd5",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 1550,
+      "msg": {
+        "kv_client_message": {
+          "id": 6,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1554,
+      "msg": {
+        "kv_server_message": {
+          "id": 7,
+          "set_blob_args": {
+            "blob_id": "9AelF+oHhW845fXfh2t0UtgXX90Uee75ZnWs4UnDqR8=",
+            "blob_data": "W2VsaWRlZCA0NTEgYnl0ZXNd"
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "d66245a9cadfadd5",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 1554,
+      "msg": {
+        "kv_client_message": {
+          "id": 7,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1582,
+      "msg": {
+        "conversation_checkpoint_update": {
+          "root_prompt_messages_json": [
+            "PKMKKrQzvZoP/MmEzrGj93OBWlTJCSQlrvn/zZoshDs=",
+            "Hv1J0RAeEC9uuAUCSnShTFj3nH1gx9pw6+91Rl51iXY=",
+            "FJD0gqpw/B0I8PggGdGLZPQD2QBwJJdIYgWuEupyRBU="
+          ],
+          "turns": [
+            "9AelF+oHhW845fXfh2t0UtgXX90Uee75ZnWs4UnDqR8="
+          ],
+          "pending_tool_calls": [
+            "{\"id\":\"1\",\"role\":\"assistant\",\"content\":[{\"type\":\"redacted-reasoning\",\"data\":\"Dwv5fL54vjryr3FZN4t-Pu_XdFP78aAo3Eed5LeX5tPQjCYqNKMwPbhj-78ftpgdZSQGZ0ciNsgm23e64qPdu6gzSN1vTNL_iBkq-iqfNI5BeisIDryDtkKeqYon0eXDhODRlB-PvwfuMBzg-Ir7eLZOsRVokLkWl5X5JHmsJnN173CmBggYd_xRddP8vW-ZqArpn0rMoB5vO2KU_dBEIzGcWZ17M2RLM_XVKltIRu1c0eNqVVW3dzweo_EatfQkXdv-QqYfDMcGcAT-TJ8S8V3IIWMacEpUzVdkS07eYnFO4rbYmMR9C25AgciuD_MoMhpmhbyhCij_EvTvmNUfPZuNFQ8CG42TzgqHCo3TfszpesZqE2d6tFgy3IQku1KIwlNJs__f2DPZiQ_6G4e8YOAgOX0VPPuKPXQ84L6RPGz_QWuzJMqxyX4bThGdqwgQSIT7MMTu8Y7a_MNzH-mbL-mOe-R9nQ\",\"providerOptions\":{\"cursor\":{\"modelName\":\"composer-2.5-fast\"}}},{\"type\":\"text\",\"text\":\"2+2 is 4.\"}],\"providerOptions\":{\"cursor\":{\"pendingToolCallStartedAtMs\":1792577344252,\"pendingToolExecutionContracts\":{}}}}"
+          ],
+          "token_details": {},
+          "previous_workspace_uris": [
+            "file:///tmp/cursor-live-ws"
+          ],
+          "mode": "AGENT_MODE_AGENT",
+          "agent_type": "cli",
+          "conversation_started_timestamp_ms": "1792577343136",
+          "conversation_started_time_zone": "UTC",
+          "recent_user_message_ids": [
+            "a3a9a7f2-4208-4dac-9e2e-5e45d7472fe8"
+          ],
+          "recent_user_message_ids_older_turn_count": 0,
+          "writes_voice_call_utterances": true
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1582,
+      "msg": {
+        "kv_server_message": {
+          "id": 8,
+          "set_blob_args": {
+            "blob_id": "6s81l+qt0acYN0kLz8yDWU7cbDK9kX+bH+/Ybdc3glA=",
+            "blob_data": "W2VsaWRlZCA2NTcgYnl0ZXNd"
+          },
+          "span_context": {
+            "trace_id": "0d965e59e720502dd35d70731be5d25f",
+            "span_id": "893936ac596194d3",
+            "trace_flags": 0
+          }
+        }
+      }
+    },
+    {
+      "dir": "client",
+      "at_ms": 1582,
+      "msg": {
+        "kv_client_message": {
+          "id": 8,
+          "set_blob_result": {}
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1615,
+      "msg": {
+        "conversation_checkpoint_update": {
+          "root_prompt_messages_json": [
+            "PKMKKrQzvZoP/MmEzrGj93OBWlTJCSQlrvn/zZoshDs=",
+            "Hv1J0RAeEC9uuAUCSnShTFj3nH1gx9pw6+91Rl51iXY=",
+            "FJD0gqpw/B0I8PggGdGLZPQD2QBwJJdIYgWuEupyRBU=",
+            "6s81l+qt0acYN0kLz8yDWU7cbDK9kX+bH+/Ybdc3glA="
+          ],
+          "turns": [
+            "9AelF+oHhW845fXfh2t0UtgXX90Uee75ZnWs4UnDqR8="
+          ],
+          "token_details": {
+            "used_tokens": 8403,
+            "max_tokens": 200000,
+            "breakdown": {
+              "total_used_tokens": 8403,
+              "max_tokens": 200000,
+              "categories": [
+                {
+                  "id": "system_prompt",
+                  "label": "System prompt",
+                  "estimated_tokens": 494,
+                  "character_count": 2111
+                },
+                {
+                  "id": "tools",
+                  "label": "Tool definitions",
+                  "estimated_tokens": 3222,
+                  "character_count": 13759
+                },
+                {
+                  "id": "rules",
+                  "label": "Rules",
+                  "estimated_tokens": 3106,
+                  "character_count": 13266
+                },
+                {
+                  "id": "skills",
+                  "label": "Skills",
+                  "character_count": 0
+                },
+                {
+                  "id": "mcp",
+                  "label": "MCP \u0026 dynamic tools",
+                  "estimated_tokens": 660,
+                  "character_count": 2819
+                },
+                {
+                  "id": "subagents",
+                  "label": "Subagent definitions",
+                  "estimated_tokens": 888,
+                  "character_count": 3791
+                },
+                {
+                  "id": "summarized_conversation",
+                  "label": "Summarized conversation",
+                  "character_count": 0
+                },
+                {
+                  "id": "conversation",
+                  "label": "Conversation",
+                  "estimated_tokens": 33,
+                  "character_count": 141
+                }
+              ]
+            }
+          },
+          "previous_workspace_uris": [
+            "file:///tmp/cursor-live-ws"
+          ],
+          "mode": "AGENT_MODE_AGENT",
+          "agent_type": "cli",
+          "conversation_started_timestamp_ms": "1792577343136",
+          "conversation_started_time_zone": "UTC",
+          "recent_user_message_ids": [
+            "a3a9a7f2-4208-4dac-9e2e-5e45d7472fe8"
+          ],
+          "recent_user_message_ids_older_turn_count": 0,
+          "writes_voice_call_utterances": true
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1616,
+      "msg": {
+        "interaction_update": {
+          "step_completed": {
+            "step_id": "2",
+            "step_duration_ms": "1184"
+          }
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "at_ms": 1620,
+      "msg": {
+        "interaction_update": {
+          "turn_ended": {
+            "input_tokens": "8317",
+            "output_tokens": "86",
+            "cache_read_tokens": "4000",
+            "cache_write_tokens": "0",
+            "reasoning_tokens": "0",
+            "ended_at_ms": "1792577344334"
+          }
+        }
+      }
+    }
+  ]
+}

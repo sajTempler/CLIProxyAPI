@@ -152,7 +152,7 @@ func TestCommittedFixturesAreValidAndRedacted(t *testing.T) {
 			t.Errorf("%s: %v", p, errLoad)
 			continue
 		}
-		if fx.Source != "recorded" && fx.Source != "reconstructed" {
+		if fx.Source != "recorded" {
 			t.Errorf("%s: source %q", p, fx.Source)
 		}
 		raw, _ := os.ReadFile(p)
@@ -162,11 +162,15 @@ func TestCommittedFixturesAreValidAndRedacted(t *testing.T) {
 	}
 }
 
-// The reconstructed fixtures encode the flow the Phase 0 spike observed.
-func TestReconstructedFixtureFlow(t *testing.T) {
-	fx, err := Load(filepath.Join("testdata", "runs", "q2-mcp-read-composer-2.5.json"))
+// The recorded tool round-trip encodes the flow the Phase 0 spike observed:
+// global rule -> get_mcp_tools (mcp_state_exec_args) -> mcp_args -> mcp_result -> turn_ended.
+func TestRecordedFixtureFlow(t *testing.T) {
+	fx, err := Load(filepath.Join("testdata", "runs", "tool-roundtrip-1.json"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if fx.Source != "recorded" {
+		t.Fatalf("source = %q", fx.Source)
 	}
 	srv, _ := fx.Server()
 	var execs []string
@@ -184,10 +188,10 @@ func TestReconstructedFixtureFlow(t *testing.T) {
 			ended = te
 		}
 	}
-	if strings.Join(execs, ",") != "mcp_state_exec_args,mcp_args:Read" {
+	if strings.Join(execs, ",") != "mcp_state_exec_args,mcp_args:lookup_secret" {
 		t.Fatalf("exec sequence = %v", execs)
 	}
-	if ended.GetInputTokens() != 25671 {
+	if ended.GetInputTokens() == 0 || ended.GetOutputTokens() == 0 {
 		t.Fatalf("turn_ended = %v", ended)
 	}
 	cli, _ := fx.Client()
