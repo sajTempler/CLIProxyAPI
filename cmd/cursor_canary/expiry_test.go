@@ -86,3 +86,11 @@ func TestRunSendsOneSessionIDAndChecksExpiry(t *testing.T) {
 		t.Fatalf("session ids = %q, want one non-empty id on both turns", sessions)
 	}
 }
+
+func TestClassifyModelsDecodesCloakedIDs(t *testing.T) {
+	body := []byte(`{"data":[{"id":"claude-haiku-5-5"},{"id":"claude-fable-5-dd-5.2-resopmoc/rosruc"}]}`)
+	model, res := classifyModels(200, body, "cursor/composer-2.5")
+	if res.Code != ExitOK || model != "cursor/composer-2.5" {
+		t.Fatalf("model=%q result=%v", model, res)
+	}
+}

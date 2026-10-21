@@ -59,7 +59,7 @@ func classifyModels(status int, body []byte, want string) (string, Result) {
 	}
 	var cursorModels []string
 	for _, m := range gjson.GetBytes(body, "data").Array() {
-		id := m.Get("id").String()
+		id := decodeCloakedModelID(m.Get("id").String())
 		if strings.HasPrefix(id, cursorModelPrefix) || m.Get("owned_by").String() == "cursor" {
 			cursorModels = append(cursorModels, id)
 		}
@@ -83,6 +83,22 @@ func classifyModels(status int, body []byte, want string) (string, Result) {
 		}
 	}
 	return cursorModels[0], ok("")
+}
+
+// cloakedModelPrefix marks a non-Claude model id listed for Anthropic-style
+// clients as claude-fable-5-dd-<id reversed>; /v1/messages accepts both forms.
+const cloakedModelPrefix = "claude-fable-5-dd-"
+
+func decodeCloakedModelID(id string) string {
+	rest, found := strings.CutPrefix(id, cloakedModelPrefix)
+	if !found {
+		return id
+	}
+	r := []rune(rest)
+	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return string(r)
 }
 
 // classifyHTTPError maps a non-2xx /v1/messages response to a verdict.
