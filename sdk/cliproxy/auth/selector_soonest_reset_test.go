@@ -283,3 +283,22 @@ func TestSoonestResetSelectorIsCustom(t *testing.T) {
 		t.Fatal("soonest-reset must stay a custom selector (no scheduler fast path)")
 	}
 }
+
+// Chained near-ties (a~b and b~c within 1 min, a and c 100 s apart) must give one
+// order regardless of input order: ties group around the soonest reset of a run.
+func TestSoonestReset_TieWindowIsTransitiveAcrossInputOrders(t *testing.T) {
+	tracker, _, _ := newSoonestFixture(t)
+	reset := soonestNow.Add(72 * time.Hour)
+	five := soonestNow.Add(time.Hour)
+	tracker.ObserveHeaders("a", "", unifiedHeaders(10, five, "", 90, reset, 0, time.Time{}), soonestNow)
+	tracker.ObserveHeaders("b", "", unifiedHeaders(10, five, "", 50, reset.Add(50*time.Second), 0, time.Time{}), soonestNow)
+	tracker.ObserveHeaders("c", "", unifiedHeaders(10, five, "", 10, reset.Add(100*time.Second), 0, time.Time{}), soonestNow)
+	for _, ids := range [][]string{{"a", "b", "c"}, {"a", "c", "b"}, {"b", "a", "c"}, {"b", "c", "a"}, {"c", "a", "b"}, {"c", "b", "a"}} {
+		auths := make([]*Auth, 0, len(ids))
+		for _, id := range ids {
+			auths = append(auths, claudeOAuthTestAuth(id))
+		}
+		// a and b tie (b has more weekly left); c resets 100 s after a, outside a's tie window.
+		assertOrder(t, RankClaudeQuota(auths, "", tracker, SoonestResetConfig{}, soonestNow), "b", "a", "c")
+	}
+}

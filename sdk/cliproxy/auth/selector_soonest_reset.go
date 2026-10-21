@@ -147,19 +147,7 @@ func RankClaudeQuota(auths []*Auth, model string, t *ClaudeQuotaTracker, cfg Soo
 		eligible = append(eligible, rank)
 	}
 
-	sort.SliceStable(eligible, func(i, j int) bool {
-		a, b := eligible[i], eligible[j]
-		if diff := a.WeeklyResetAt.Sub(b.WeeklyResetAt); diff > soonestResetTieWindow || diff < -soonestResetTieWindow {
-			return diff < 0
-		}
-		if a.weeklyRemaining != b.weeklyRemaining {
-			return a.weeklyRemaining > b.weeklyRemaining
-		}
-		if a.fiveHourUsed != b.fiveHourUsed {
-			return a.fiveHourUsed < b.fiveHourUsed
-		}
-		return a.AuthID < b.AuthID
-	})
+	sortEligibleBySoonestReset(eligible)
 	sort.SliceStable(unknown, func(i, j int) bool { return unknown[i].AuthID < unknown[j].AuthID })
 	sort.SliceStable(skipped, func(i, j int) bool {
 		a, b := skipped[i], skipped[j]
@@ -173,6 +161,39 @@ func RankClaudeQuota(auths []*Auth, model string, t *ClaudeQuotaTracker, cfg Soo
 	out = append(out, eligible...)
 	out = append(out, unknown...)
 	return append(out, skipped...)
+}
+
+// sortEligibleBySoonestReset orders eligible ranks by weekly reset, soonest
+// first. Resets within soonestResetTieWindow of a group's soonest reset tie and
+// are broken by more weekly remaining, less 5h used, then auth ID. Grouping by
+// an anchor keeps the order transitive: a pairwise "within 1 min" comparator
+// would let chained near-ties depend on input order.
+func sortEligibleBySoonestReset(eligible []ClaudeQuotaRank) {
+	sort.SliceStable(eligible, func(i, j int) bool {
+		if !eligible[i].WeeklyResetAt.Equal(eligible[j].WeeklyResetAt) {
+			return eligible[i].WeeklyResetAt.Before(eligible[j].WeeklyResetAt)
+		}
+		return eligible[i].AuthID < eligible[j].AuthID
+	})
+	for start := 0; start < len(eligible); {
+		anchor := eligible[start].WeeklyResetAt
+		end := start + 1
+		for end < len(eligible) && eligible[end].WeeklyResetAt.Sub(anchor) <= soonestResetTieWindow {
+			end++
+		}
+		group := eligible[start:end]
+		sort.SliceStable(group, func(i, j int) bool {
+			a, b := group[i], group[j]
+			if a.weeklyRemaining != b.weeklyRemaining {
+				return a.weeklyRemaining > b.weeklyRemaining
+			}
+			if a.fiveHourUsed != b.fiveHourUsed {
+				return a.fiveHourUsed < b.fiveHourUsed
+			}
+			return a.AuthID < b.AuthID
+		})
+		start = end
+	}
 }
 
 // SoonestResetSelector picks the Claude account whose weekly window resets
