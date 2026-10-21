@@ -40,3 +40,26 @@ It compares the installed agent with `SNAPSHOT.txt` and prints:
 Removing an unlisted field is not fatal on purpose. Between agent 2026.09.26 and 2026.10.19, Cursor removed 9 fields from messages we use (for example `adopt_args` and `prompt_suggestion`), and none of them matter to us. Add a field to `used` as soon as provider code reads or writes it.
 
 After a breaking report: regenerate, then `go build ./...`. Compile errors point at the code that used the changed fields. Fix the code, run the golden-fixture tests and the canary, then commit the regenerated package and `SNAPSHOT.txt` together.
+
+## Golden fixtures (`internal/runtime/executor/helps/cursorfixture`)
+
+These are recorded `Run` streams that tests replay, so `go test` never talks to Cursor. Each fixture is one JSON file under `cursorfixture/testdata/runs/`, in format `cursor-run-fixture/v1`. The package doc comment documents the format. In short:
+- Ordered `frames` with `dir` (`client`/`server`), `at_ms`, and `msg`. `msg` is the `AgentClientMessage`/`AgentServerMessage` as protojson with proto field names.
+- An optional Connect `end_stream` JSON.
+- `Fixture.ServerConnectStream()` rebuilds the Connect-framed response body for wire-level tests.
+
+Redaction: `Recorder` passes every message through `Redactor` before storing it. Redactor replaces:
+- JWTs, bearer tokens and API-key-shaped strings;
+- emails;
+- `/Users/<name>` and `/home/<name>` paths;
+- the machine's user and host names;
+- the whole value of credential-named fields (`*token*`, `*secret*`, `*credential*`, ...).
+
+UTF-8 `bytes` fields, such as KV blobs, are redacted as text. This means blob ids no longer match the redacted blob data. `TestCommittedFixturesAreValidAndRedacted` fails if a committed fixture still matches a secret pattern or this machine's identity. Review the JSON diff anyway before committing.
+
+Current fixtures are `source: "reconstructed"`. The Phase 0 spike kept only per-run summaries, not frame bytes, so the two files were rebuilt from runs 11 and 10 of the spike:
+- What's real: event order, exec types, tool names/args/results and token counts.
+- What's condensed or a placeholder: text and thinking are condensed, and ids are placeholders.
+- What's left out: checkpoint and KV traffic.
+
+Replace them with `source: "recorded"` fixtures once the Phase 2 wire client can feed a `Recorder`.
