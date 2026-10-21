@@ -5,6 +5,7 @@ import (
 	"os/user"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -50,6 +51,34 @@ func sensitiveField(name string) bool {
 // (user name, host name) from strings and protobuf messages.
 type Redactor struct {
 	literals []string
+	allow    []string
+}
+
+// Allow exempts tokens from literal redaction. A model id can contain a
+// short host name ("gpt-5.4-mini" on a host called "mini") without being
+// machine identity. Secret patterns still apply inside allowed tokens.
+func (r *Redactor) Allow(tokens ...string) {
+	for _, t := range tokens {
+		if t = strings.TrimSpace(t); t != "" {
+			r.allow = append(r.allow, t)
+		}
+	}
+	sort.Slice(r.allow, func(i, j int) bool { return len(r.allow[i]) > len(r.allow[j]) })
+}
+
+// maskAllowed swaps allowed tokens for placeholders that no literal matches.
+func maskAllowed(s string, allow []string) (string, func(string) string) {
+	if len(allow) == 0 {
+		return s, func(x string) string { return x }
+	}
+	var pairs []string
+	for i, a := range allow {
+		ph := "\x00" + strconv.Itoa(i) + "\x00"
+		s = strings.ReplaceAll(s, a, ph)
+		pairs = append(pairs, ph, a)
+	}
+	restore := strings.NewReplacer(pairs...)
+	return s, restore.Replace
 }
 
 // NewRedactor returns a redactor that also replaces each non-trivial literal with "user".
@@ -86,10 +115,11 @@ func (r *Redactor) String(s string) string {
 	for _, p := range patterns {
 		s = p.re.ReplaceAllString(s, p.repl)
 	}
+	s, restore := maskAllowed(s, r.allow)
 	for _, l := range r.literals {
 		s = replaceFold(s, l, RedactedUser)
 	}
-	return s
+	return restore(s)
 }
 
 func replaceFold(s, old, repl string) string {
@@ -193,6 +223,11 @@ func (r *Redactor) value(fd protoreflect.FieldDescriptor, v protoreflect.Value, 
 // Scan returns the names of secret patterns and literals found in data.
 // Fixture tests use it as a guard: committed fixtures must scan clean.
 func Scan(data []byte, literals ...string) []string {
+	return ScanAllowing(data, nil, literals...)
+}
+
+// ScanAllowing is Scan with tokens exempt from the literal check (see Redactor.Allow).
+func ScanAllowing(data []byte, allow []string, literals ...string) []string {
 	var hits []string
 	s := string(data)
 	for _, p := range patterns {
@@ -203,7 +238,8 @@ func Scan(data []byte, literals ...string) []string {
 			}
 		}
 	}
-	lower := strings.ToLower(s)
+	masked, _ := maskAllowed(s, allow)
+	lower := strings.ToLower(masked)
 	for _, l := range literals {
 		if l = strings.TrimSpace(l); len(l) >= 3 && strings.Contains(lower, strings.ToLower(l)) {
 			hits = append(hits, "literal: "+l)
