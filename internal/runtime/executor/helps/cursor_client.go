@@ -278,8 +278,10 @@ func (c *CursorClient) answerPending(run *cursorLiveRun, sess *cursorSession, cr
 // response's tool_use. tool_requests_listed is not used: its count covers the
 // whole step, including calls answered in earlier responses.
 func (r *cursorLiveRun) pump(ctx context.Context, em *cursorClaudeEmitter, sess *cursorSession) (string, error) {
+	em.priorOutput = r.reportedOutput
 	for {
 		if len(sess.pending) > 0 && r.events.empty() {
+			r.reportedOutput += em.outputTokens
 			return cursorStopToolUse, em.finish(cursorStopToolUse, nil)
 		}
 		ev, err := r.events.pop(ctx)
@@ -355,6 +357,7 @@ type cursorClaudeEmitter struct {
 	index        int
 	open         string // type of the open content block, "" when none
 	outputTokens int64
+	priorOutput  int64 // output tokens earlier responses of the same Run reported
 	// thinkingEnabled surfaces thinking deltas as thinking blocks; when the
 	// request did not ask for thinking they are dropped.
 	thinkingEnabled bool
@@ -442,9 +445,11 @@ func (e *cursorClaudeEmitter) toolUse(c *cursorToolCall) error {
 	return e.closeBlock()
 }
 
-// finish closes the response. usage is the Run's turn_ended (cumulative over
-// the Run's steps) when the Run ended; otherwise only the output tokens Cursor
-// streamed for this response are known.
+// finish closes the response. usage is the Run's turn_ended when the Run
+// ended: input and cache counts are cumulative over the Run's steps and go on
+// this final response; output is reduced by what earlier tool_use responses
+// of the same Run already reported, so per-response usage sums to the Run's.
+// A tool_use response only knows the output tokens streamed for it.
 func (e *cursorClaudeEmitter) finish(stop string, usage *cursorpb.TurnEndedUpdate) error {
 	if err := e.closeBlock(); err != nil {
 		return err
@@ -456,7 +461,7 @@ func (e *cursorClaudeEmitter) finish(stop string, usage *cursorpb.TurnEndedUpdat
 	if usage != nil {
 		cacheRead, cacheWrite := usage.GetCacheReadTokens(), usage.GetCacheWriteTokens()
 		u["input_tokens"] = max(usage.GetInputTokens()-cacheRead-cacheWrite, 0)
-		u["output_tokens"] = usage.GetOutputTokens()
+		u["output_tokens"] = max(usage.GetOutputTokens()-e.priorOutput, 0)
 		u["cache_read_input_tokens"] = cacheRead
 		u["cache_creation_input_tokens"] = cacheWrite
 	}

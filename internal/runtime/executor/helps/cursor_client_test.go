@@ -332,6 +332,10 @@ func TestCursorStreamToolRoundTripThenNewTurn(t *testing.T) {
 	if !strings.Contains(b.text(), "PURPLE-42") || b.StopReason != cursorStopEndTurn || len(b.toolUses()) != 0 {
 		t.Fatalf("second response: %q %q", b.text(), b.StopReason)
 	}
+	// Per-response output tokens add up to the Run's turn_ended total.
+	if te := lastTurnEnded(t, rt.fixtures[0]); a.Usage["output_tokens"].(float64)+b.Usage["output_tokens"].(float64) != float64(te.GetOutputTokens()) {
+		t.Fatalf("output tokens %v + %v != %d", a.Usage["output_tokens"], b.Usage["output_tokens"], te.GetOutputTokens())
+	}
 	conv.assistant(b)
 	conv.user("Thanks. Now say the value backwards, no tools.")
 

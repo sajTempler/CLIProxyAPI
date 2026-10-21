@@ -128,6 +128,10 @@ type cursorLiveRun struct {
 	rctx  cursorRunContext
 
 	closeOnce sync.Once
+
+	// reportedOutput is the output token count earlier tool_use responses of
+	// this Run reported (guarded by the session turn).
+	reportedOutput int64
 }
 
 // startCursorRun opens a Run, sends first and starts the reader (and the
