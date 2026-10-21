@@ -2,7 +2,8 @@
 
 Goal: show what the agent CLI's `/usage` view shows (monthly Included % with Auto and API
 buckets, On-Demand $spent/$limit, reset date) per Cursor account, the same way the Claude quota
-work on `feat/quota-routing` shows 5h/7d windows. Design only; nothing here is implemented yet.
+work on `feat/quota-routing` shows 5h/7d windows. Sections 1-4 are the design; section 5 is the
+fixed endpoint contract the dashboard builds against.
 
 Evidence: agent CLI 2026.10.19-6bbf2c4 (`544.index.js`, module `./src/usage/usage-data.ts`, and
 `index.js`, `../cursor-config/dist/dashboard.js`), plus 3 live calls on 2026-10-21 with the
@@ -113,14 +114,16 @@ polling is the only source (unlike Claude, where headers are primary).
 - Default interval **15 min** ± 10 % jitter, 1 min floor, per account; the values move slowly
   (monthly window) and the CLI itself only calls on demand. Manual refresh always allowed.
 - `GetCurrentPeriodUsage` on every poll. `GetPlanInfo` on the first poll and then every 24 h.
-  `GetHardLimit` only when rule 1 above does not apply (no `individualLimit`), every 6 h.
-  Steady state: 4 calls/hour/account.
+  `GetHardLimit` every 6 h, skipped when `limitType == "team"` and `individualLimit` is present
+  (rule 1 decides alone there; for personal accounts the CLI lets `GetHardLimit` override
+  `individualLimit`, so it is always needed). Steady state: 4 calls/hour/account.
 - Poll only accounts with `type: "cursor"`, not disabled, with `access_token` and `expired` in the
   future; otherwise `poll_error = "token_expired"` (the auth layer owns re-login warnings).
 - 429 / `resource_exhausted`: back off `retry-after` or 5 min, capped at 1 h (same as Claude).
   401: `poll_error = "unauthorized"`, next poll at `now + interval`.
-- Opt-in like Claude's D7: poll when `routing.cursor-quota.refresh-interval` is set or when the
-  quota page asks for it; default off for upstream friendliness, on in this fork's config.
+- Config `routing.cursor-quota.refresh-interval`: unset/`""` = 15 min (only cursor auth files are
+  polled, and they exist only after a deliberate login/import), `"0"` = no background polling
+  (manual refresh still works), below 1 min clamps to 1 min. Hot-reloaded.
 - No HTTP client timeout after connect (AGENTS.md), single-flight per account, cancel on shutdown.
   Credential acquisition is the only place allowed a timeout, so a probe-style 10 s timeout is
   **not** allowed here.
@@ -177,3 +180,125 @@ Recommendation: **generalize the HTTP surface, keep the trackers per provider.**
 Ordering: this needs only Phase 3 (cursor auth files) and the quota-routing merge; it does **not**
 need the Cursor executor (Phase 4), so usage can show in the dashboard before inference works.
 The poller should still not run for cursor auths the user disabled.
+
+## 5. Endpoint contract (fixed)
+
+Branch `feat/cursor-usage`. This section wins over the sketch in section 4.2. Display-only: no
+routing data. `GET /v8/management/quota/claude` and its refresh are unchanged.
+
+### `GET /v8/management/quota/cursor`
+
+Management auth like every `/v8/management` route. Always 200 (an empty `credentials` array when
+there are no cursor auth files); 503 `{"error": "core auth manager unavailable"}` only if the
+server has no auth manager.
+
+```json
+{
+  "provider": "cursor",
+  "generated_at": "2026-10-21T09:00:00Z",
+  "refresh_interval_seconds": 900,
+  "summary": {
+    "credentials": 1,
+    "loaded": 1,
+    "window": "included",
+    "remaining_percent_sum": 77.41,
+    "capacity_percent": 100,
+    "segments": [{"auth_index": "3", "remaining_percent": 77.41}],
+    "on_demand_used_usd_sum": 117.87,
+    "next_reset_at": "2026-10-30T22:31:53Z"
+  },
+  "credentials": [
+    {
+      "auth_index": "3",
+      "id": "cursor-user@example.com.json",
+      "name": "cursor-user@example.com.json",
+      "email": "user@example.com",
+      "label": "",
+      "disabled": false,
+      "status": "active",
+      "plan": {"label": "Team", "price": "$40/mo"},
+      "windows": {
+        "included":      {"kind": "percent", "used_percent": 22.5864, "remaining_percent": 77.4136, "resets_at": "2026-10-30T22:31:53Z", "observed_at": "2026-10-21T08:59:58Z", "source": "poll"},
+        "included_auto": {"kind": "percent", "used_percent": 7.8114,  "remaining_percent": 92.1886, "resets_at": "2026-10-30T22:31:53Z", "observed_at": "2026-10-21T08:59:58Z", "source": "poll"},
+        "included_api":  {"kind": "percent", "used_percent": 100,     "remaining_percent": 0,       "resets_at": "2026-10-30T22:31:53Z", "observed_at": "2026-10-21T08:59:58Z", "source": "poll"},
+        "on_demand": {
+          "kind": "spend", "limit_kind": "fixed", "limit_scope": "",
+          "used_usd": 117.87, "limit_usd": 400, "remaining_usd": 282.13, "used_percent": 29.4675,
+          "resets_at": "2026-10-30T22:31:53Z", "observed_at": "2026-10-21T08:59:58Z", "source": "poll"
+        }
+      },
+      "extra": {
+        "billing_cycle_start": "2026-09-30T22:31:53Z",
+        "included_spend_usd": 20, "included_limit_usd": 20, "bonus_usd": 262.33, "total_spend_usd": 282.33,
+        "auto_bucket_models": ["default", "composer-2"]
+      },
+      "last_poll_at": "2026-10-21T08:59:58Z",
+      "next_poll_at": "2026-10-21T09:14:10Z",
+      "poll_started_at": null,
+      "poll_error": ""
+    }
+  ]
+}
+```
+
+Rules (every key is always present; "nullable" means the value is JSON `null`, never omitted):
+
+- Times: RFC 3339 UTC strings or `null`. Money: US dollars as JSON numbers (cents / 100, not
+  rounded). Percentages: 0-100 floats, not rounded and not clamped (upstream may exceed 100).
+- `refresh_interval_seconds`: background poll interval of the running poller; `0` = background
+  polling off (manual refresh still works).
+- `credentials[]`: every auth with `type: "cursor"` (including disabled ones), ordered by file
+  name. `auth_index`, `id`, `name`, `email`, `label`, `disabled`, `status` mean the same as in the
+  Claude endpoint; `email` is full (the UI masks it) and `""` when unknown.
+- `plan`: nullable until `GetPlanInfo` succeeded once. `label` = `planName` or `"Current plan"`;
+  `price` = upstream string or `""`.
+- `windows`: always an object with exactly the four keys `included`, `included_auto`,
+  `included_api`, `on_demand` (display in that order). Each value is `null` until the first
+  successful poll; after that, values persist through later failed polls (stale data keeps its
+  `observed_at`; `poll_error` tells the UI it is stale).
+- Percent windows (`kind: "percent"`): `used_percent` per section 2 (`included` =
+  `totalPercentUsed`, else `includedSpend / limit * 100`, else 0; `included_auto`/`included_api` =
+  `autoPercentUsed`/`apiPercentUsed`, missing = 0). `remaining_percent = max(0, 100 - used_percent)`.
+  To match the CLI, render percentages as `round(clamp(p, 0, 100))`, except values in (0, 1)
+  render as `1%`.
+- `resets_at`: `billingCycleEnd`, else `planInfo.billingCycleEnd`, else `null` (CLI: "Current
+  period"). The CLI formats it as `Resets MMM d` in **UTC**. Same value in all four windows.
+- `observed_at`: when the poll that produced the value finished. `source`: always `"poll"`.
+- On-demand window (`kind: "spend"`): `limit_kind` ∈ `fixed | unlimited | disabled | unavailable`
+  per the section 2 rule. `limit_scope` is `"team_member"` or `"personal"` for `unlimited` (CLI
+  detail "No personal limit" / "No monthly limit"), else `""`. `used_usd` =
+  `individualUsed / 100` (0 when missing), always a number. `limit_usd`, `remaining_usd`
+  (`max(0, limit - used)`) and `used_percent` (`used / limit * 100`) are numbers only for
+  `fixed`, otherwise `null`. CLI rendering: `fixed` → `$used / $limit` + `$remaining remaining`;
+  other kinds → `$used` when > 0, else `Disabled` / `Unavailable` (`unlimited` always shows
+  `$used`); dollars use 0 decimals when integral, else 2.
+- `extra`: nullable until the first successful poll. `billing_cycle_start` nullable;
+  `included_spend_usd`, `included_limit_usd`, `bonus_usd`, `total_spend_usd` come from `planUsage`
+  (`includedSpend`, `limit`, `bonusSpend`, `totalSpend`, cents / 100); `auto_bucket_models` is a
+  string array (`[]` when missing).
+- `last_poll_at` (last successful poll), `next_poll_at`, `poll_started_at` (non-null while a poll
+  is in flight): nullable times.
+- `poll_error`: `""` after a successful poll, else one fixed code: `token_expired` (the auth
+  file's `expired` is in the past; no call made, the user must re-login), `no_access_token`,
+  `unauthorized` (401 / Connect `unauthenticated`), `rate_limited (429)` / `rate_limited (403)`
+  (backing off), `request_failed` (network), `invalid_response`, `http_<status>`,
+  `usage_unavailable` (no `planUsage`, e.g. Enterprise; windows stay `null`).
+- `summary`: `credentials` = number of entries; `loaded` = entries whose `included` window is
+  non-null; `window` is always `"included"`; `remaining_percent_sum` / `capacity_percent` (100 per
+  loaded entry) and `segments` cover loaded entries only; `on_demand_used_usd_sum` sums `used_usd`
+  over loaded entries; `next_reset_at` = earliest future `resets_at` among loaded entries, else
+  `null`.
+
+### `POST /v8/management/quota/cursor/refresh`
+
+Body `{"auth_index": "3"}` refreshes one credential, `{}` or an empty body refreshes every
+enabled cursor credential (concurrently). The call is synchronous and returns
+`200 {"credentials": [<entry as above>...]}` with the refreshed entries only.
+
+- Unknown `auth_index` → `404 {"error": "cursor credential not found"}`.
+- Malformed JSON → `400 {"error": "invalid body"}`.
+- Single credential in backoff (after 429/403) → `429 {"error": "backoff", "retry_after_seconds": N}`
+  without an upstream call. In the all-credentials form, per-credential failures (backoff, 401,
+  expired token) show up only in each entry's `poll_error`.
+- Poller not running → `503 {"error": "cursor quota poller is not running"}`.
+- Concurrent refreshes of one credential share a single upstream call.
