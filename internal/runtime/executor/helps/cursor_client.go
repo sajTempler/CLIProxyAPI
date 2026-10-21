@@ -49,6 +49,9 @@ type CursorStreamRequest struct {
 	ConversationKey string
 	// Model is the Cursor model id (e.g. "composer-2.5").
 	Model string
+	// ResponseModel is the model name reported to the client (e.g.
+	// "cursor/composer-2.5"); empty reports Model.
+	ResponseModel string
 	// Body is the Claude Messages request JSON.
 	Body []byte
 }
@@ -92,7 +95,11 @@ func (c *CursorClient) Stream(ctx context.Context, req CursorStreamRequest, emit
 	if err = c.awaitFinishing(ctx, sess); err != nil {
 		return err
 	}
-	em := newCursorClaudeEmitter(req.Model, emit)
+	shownModel := req.ResponseModel
+	if shownModel == "" {
+		shownModel = req.Model
+	}
+	em := newCursorClaudeEmitter(shownModel, emit)
 	em.thinkingEnabled = creq.Thinking
 	n := len(creq.Messages)
 	results := creq.toolResults()

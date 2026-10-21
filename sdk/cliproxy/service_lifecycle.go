@@ -432,4 +432,6 @@ func (s *Service) startModelCatalogUpdaters(ctx context.Context) {
 		proxyURL = cfg.ProxyURL
 	}
 	executor.StartXAIVersionUpdater(ctx, proxyURL)
+	executor.StartCursorVersionUpdater(ctx)
+	executor.StartCursorSessionSweeper(ctx)
 }

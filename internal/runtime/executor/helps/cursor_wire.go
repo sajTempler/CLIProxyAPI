@@ -96,11 +96,36 @@ type cursorTransport interface {
 	OpenRun(ctx context.Context, first *cursorpb.AgentClientMessage) (cursorRunConn, error)
 }
 
+// cursorCallKey carries one request's credentials (WithCursorCall).
+type cursorCallKey struct{}
+
+type cursorCall struct {
+	token  string
+	client *http.Client
+}
+
+// WithCursorCall binds the access token and HTTP client of the auth serving
+// one request. A transport shared by several auths reads them from the
+// context; Runs keep the values because they detach only from cancellation.
+func WithCursorCall(ctx context.Context, token string, client *http.Client) context.Context {
+	return context.WithValue(ctx, cursorCallKey{}, cursorCall{token: token, client: client})
+}
+
+func cursorCallFrom(ctx context.Context) (cursorCall, bool) {
+	if ctx == nil {
+		return cursorCall{}, false
+	}
+	c, ok := ctx.Value(cursorCallKey{}).(cursorCall)
+	return c, ok
+}
+
 // CursorHTTPTransport speaks Connect over HTTP/2 to the Cursor agent host.
 type CursorHTTPTransport struct {
 	// Client must support HTTP/2 full duplex. Nil uses a plain http2.Transport.
 	// No client timeout may be set (AGENTS.md: no timeouts after connect).
+	// A client bound with WithCursorCall takes precedence.
 	Client *http.Client
+	// Tokens supplies the access token; nil reads it from WithCursorCall.
 	Tokens CursorTokenSource
 	// BackendURL defaults to CursorBackendURL; AgentURL skips discovery when set.
 	BackendURL string
@@ -114,7 +139,10 @@ type CursorHTTPTransport struct {
 	discAt     time.Time
 }
 
-func (t *CursorHTTPTransport) client() *http.Client {
+func (t *CursorHTTPTransport) client(ctx context.Context) *http.Client {
+	if call, ok := cursorCallFrom(ctx); ok && call.client != nil {
+		return call.client
+	}
 	if t.Client != nil {
 		return t.Client
 	}
@@ -192,7 +220,7 @@ func (t *CursorHTTPTransport) discoverAgentHost(ctx context.Context) (string, er
 	}
 	t.headers(req.Header, token)
 	req.Header.Set("Content-Type", "application/proto")
-	resp, err := t.client().Do(req)
+	resp, err := t.client(ctx).Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -228,7 +256,14 @@ func cursorAgentURLFromConfig(c *cursorpb.AgentUrlConfig) (string, error) {
 
 func (t *CursorHTTPTransport) token(ctx context.Context) (string, error) {
 	if t.Tokens == nil {
-		return "", errors.New("cursor: no token source")
+		call, ok := cursorCallFrom(ctx)
+		if !ok {
+			return "", errors.New("cursor: no token source")
+		}
+		if call.token == "" {
+			return "", errors.New("cursor token: empty")
+		}
+		return call.token, nil
 	}
 	token, err := t.Tokens.CursorAccessToken(ctx)
 	if err != nil {
@@ -263,7 +298,7 @@ func (t *CursorHTTPTransport) OpenRun(ctx context.Context, first *cursorpb.Agent
 	// is written concurrently with Do, which returns at response headers.
 	sent := make(chan error, 1)
 	go func() { sent <- c.Send(first) }()
-	resp, err := t.client().Do(req)
+	resp, err := t.client(ctx).Do(req)
 	if err != nil {
 		_ = pw.CloseWithError(err)
 		return nil, err

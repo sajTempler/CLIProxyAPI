@@ -198,6 +198,27 @@ func (st *CursorSessionStore) Sweep() {
 	st.sweepLocked()
 }
 
+// StartSweeper runs Sweep every interval until ctx ends, so a Run held for a
+// tool_result that never comes closes after the idle TTL even when no new
+// request arrives.
+func (st *CursorSessionStore) StartSweeper(ctx context.Context, every time.Duration) {
+	if every <= 0 {
+		every = time.Minute
+	}
+	go func() {
+		tick := time.NewTicker(every)
+		defer tick.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				st.Sweep()
+			}
+		}
+	}()
+}
+
 // Len reports the number of sessions (tests, diagnostics).
 func (st *CursorSessionStore) Len() int {
 	st.mu.Lock()
