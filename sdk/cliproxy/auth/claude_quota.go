@@ -118,6 +118,23 @@ type ClaudeQuotaRefresher interface {
 	Interval() time.Duration
 }
 
+// ClaudeQuotaBackoffError reports that usage polling for a credential is
+// backing off after the usage endpoint answered 429 or 403.
+type ClaudeQuotaBackoffError struct {
+	Status     int
+	RetryAfter time.Duration
+}
+
+func (e *ClaudeQuotaBackoffError) Error() string {
+	if e == nil {
+		return "backoff"
+	}
+	if e.Status > 0 {
+		return "rate_limited (" + strconv.Itoa(e.Status) + ")"
+	}
+	return "backoff"
+}
+
 // ClaudeQuotaTracker merges passive response headers and usage-endpoint polls
 // into per-credential, per-window quota snapshots. It owns its own lock and
 // never calls back into the Manager, so it is safe to feed from MarkResult.
