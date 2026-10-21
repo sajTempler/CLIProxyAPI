@@ -57,12 +57,34 @@ Redaction: `Recorder` passes every message through `Redactor` before storing it.
 
 UTF-8 `bytes` fields, such as KV blobs, are redacted as text. This means blob ids no longer match the redacted blob data. `TestCommittedFixturesAreValidAndRedacted` fails if a committed fixture still matches a secret pattern or this machine's identity. Review the JSON diff anyway before committing.
 
-Current fixtures are `source: "reconstructed"`. The Phase 0 spike kept only per-run summaries, not frame bytes, so the two files were rebuilt from runs 11 and 10 of the spike:
-- What's real: event order, exec types, tool names/args/results and token counts.
-- What's condensed or a placeholder: text and thinking are condensed, and ids are placeholders.
-- What's left out: checkpoint and KV traffic.
+Two exceptions keep fixtures reviewable:
+- `Recorder.ElideBlobs` replaces KV blob payloads with `[elided N bytes]`. Blobs hold Cursor's own harness prompt and rendered context, are large, and replay never reads them.
+- The fixture's model id is exempt from literal redaction (`Redactor.Allow`, `ScanAllowing`). Otherwise a host called `mini` turns `gpt-5.4-mini` into `gpt-5.4-user`.
 
-Replace them with `source: "recorded"` fixtures once the Phase 2 wire client can feed a `Recorder`.
+### Recorded fixtures
+
+All fixtures are `source: "recorded"` (agent 2026.10.19-6bbf2c4, 2026-10-21). Multi-Run conversations are numbered `-1`, `-2`.
+
+| Fixture | Model | What it exercises |
+|---|---|---|
+| `plain-text` | composer-2.5 | text + thinking, `turn_ended` usage |
+| `tool-roundtrip-1`, `-2` | composer-2.5 | held Run: `tool_use` → `mcp_result` → answer; then a new user turn on the checkpoint (Run 2) |
+| `two-tools`, `two-tools-gpt`, `two-tools-sonnet` | composer-2.5, gpt-5.4-mini, claude-sonnet-5-low | two calls generated in one step |
+| `resume-lost-run-1`, `-2` | composer-2.5 | held Run dropped after `tool_use`; Run 2 is `resume_action` on the checkpoint, its regenerated call answered from the cached result |
+| `big-prompt` | composer-2.5 | ~15k-token synthetic Claude Code-style system prompt as the global rule |
+
+Tests replay them through `cursorReplayTransport` (`helps/cursor_client_test.go`). It releases each server frame only after the client has sent as many `mcp_result`s as preceded it in the recording, so a held Run waits for its tool result like the live server.
+
+### Re-recording
+
+The live harness is a test behind the `cursorlive` build tag (`helps/cursor_live_test.go`). It drives the real `CursorClient` against Cursor, reads the token from the keychain (service `cursor-access-token`, account `cursor-user`) at runtime, and never prints or writes it:
+
+```bash
+CURSOR_LIVE_SCENARIO=tool-roundtrip go test -tags cursorlive -run TestCursorLive -v ./internal/runtime/executor/helps/
+# CURSOR_FIXTURE_OUT=<dir> writes elsewhere; CURSOR_LIVE_TRACE=1 logs every frame kind.
+```
+
+Scenarios: `plain-text`, `tool-roundtrip`, `two-tools`, `two-tools-gpt`, `two-tools-sonnet`, `resume-lost-run`, `big-prompt`. Every Run counts against `temp/cursor-phase2/live-runs.txt` (cap 30; reset the file deliberately). Run scenarios one at a time. Then run `go test ./internal/runtime/executor/helps/...`, which includes the redaction guard, and review the JSON diff. Assertions that depend on model wording (`24-ELPURP`, `ZQX> `) may need updating after a re-record.
 
 ## Client version (`helps/cursor_version.go`)
 

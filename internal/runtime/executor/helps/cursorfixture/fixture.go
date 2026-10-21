@@ -177,6 +177,11 @@ func (f *Fixture) Write(path string) error {
 
 // Recorder builds a fixture from live traffic, redacting every message.
 type Recorder struct {
+	// ElideBlobs replaces KV blob payloads (set_blob data, get_blob results)
+	// with "[elided N bytes]". Blobs hold Cursor's own harness prompt and
+	// rendered context, are large, and replay tests never read them.
+	ElideBlobs bool
+
 	fx    Fixture
 	start time.Time
 	now   func() time.Time
@@ -191,6 +196,7 @@ func NewRecorder(agentVersion, model, description string, red *Redactor, now fun
 	if red == nil {
 		red = NewRedactor(DefaultLiterals()...)
 	}
+	red.Allow(model)
 	return &Recorder{
 		fx:    Fixture{Format: Format, AgentVersion: agentVersion, Model: model, Source: "recorded", Description: description},
 		start: now(),
@@ -213,6 +219,9 @@ func (r *Recorder) EndStream(raw []byte) {
 func (r *Recorder) add(dir string, m proto.Message) error {
 	c := proto.Clone(m)
 	r.red.Message(c)
+	if r.ElideBlobs {
+		elideBlobs(c)
+	}
 	raw, err := marshalOpts.Marshal(c)
 	if err != nil {
 		return err
@@ -224,6 +233,20 @@ func (r *Recorder) add(dir string, m proto.Message) error {
 	}
 	r.fx.Frames = append(r.fx.Frames, Frame{Dir: dir, AtMs: r.now().Sub(r.start).Milliseconds(), Msg: compact.Bytes()})
 	return nil
+}
+
+func elideBlobs(m proto.Message) {
+	elide := func(b []byte) []byte { return []byte(fmt.Sprintf("[elided %d bytes]", len(b))) }
+	switch v := m.(type) {
+	case *cursorpb.AgentServerMessage:
+		if set := v.GetKvServerMessage().GetSetBlobArgs(); set != nil {
+			set.BlobData = elide(set.BlobData)
+		}
+	case *cursorpb.AgentClientMessage:
+		if get := v.GetKvClientMessage().GetGetBlobResult(); get != nil && get.BlobData != nil {
+			get.BlobData = elide(get.BlobData)
+		}
+	}
 }
 
 // Fixture returns the recording so far.

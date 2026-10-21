@@ -152,21 +152,25 @@ func TestCommittedFixturesAreValidAndRedacted(t *testing.T) {
 			t.Errorf("%s: %v", p, errLoad)
 			continue
 		}
-		if fx.Source != "recorded" && fx.Source != "reconstructed" {
+		if fx.Source != "recorded" {
 			t.Errorf("%s: source %q", p, fx.Source)
 		}
 		raw, _ := os.ReadFile(p)
-		if hits := Scan(raw, DefaultLiterals()...); len(hits) > 0 {
+		if hits := ScanAllowing(raw, []string{fx.Model}, DefaultLiterals()...); len(hits) > 0 {
 			t.Errorf("%s is not redacted: %v", p, hits)
 		}
 	}
 }
 
-// The reconstructed fixtures encode the flow the Phase 0 spike observed.
-func TestReconstructedFixtureFlow(t *testing.T) {
-	fx, err := Load(filepath.Join("testdata", "runs", "q2-mcp-read-composer-2.5.json"))
+// The recorded tool round-trip encodes the flow the Phase 0 spike observed:
+// global rule -> get_mcp_tools (mcp_state_exec_args) -> mcp_args -> mcp_result -> turn_ended.
+func TestRecordedFixtureFlow(t *testing.T) {
+	fx, err := Load(filepath.Join("testdata", "runs", "tool-roundtrip-1.json"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if fx.Source != "recorded" {
+		t.Fatalf("source = %q", fx.Source)
 	}
 	srv, _ := fx.Server()
 	var execs []string
@@ -184,14 +188,56 @@ func TestReconstructedFixtureFlow(t *testing.T) {
 			ended = te
 		}
 	}
-	if strings.Join(execs, ",") != "mcp_state_exec_args,mcp_args:Read" {
+	if strings.Join(execs, ",") != "mcp_state_exec_args,mcp_args:lookup_secret" {
 		t.Fatalf("exec sequence = %v", execs)
 	}
-	if ended.GetInputTokens() != 25671 {
+	if ended.GetInputTokens() == 0 || ended.GetOutputTokens() == 0 {
 		t.Fatalf("turn_ended = %v", ended)
 	}
 	cli, _ := fx.Client()
 	if cli[0].GetRunRequest().GetAction().GetUserMessageAction().GetRequestContext().GetRules()[0].GetType().GetGlobal() == nil {
 		t.Fatal("system prompt is not a global rule")
+	}
+}
+
+func TestRedactorAllowsModelIDs(t *testing.T) {
+	r := NewRedactor("mini")
+	r.Allow("gpt-5.4-mini")
+	if got := r.String("routed to gpt-5.4-mini-medium on mini"); got != "routed to gpt-5.4-mini-medium on user" {
+		t.Fatalf("got %q", got)
+	}
+	if hits := ScanAllowing([]byte("model gpt-5.4-mini"), []string{"gpt-5.4-mini"}, "mini"); len(hits) != 0 {
+		t.Fatalf("allowed token flagged: %v", hits)
+	}
+	if hits := ScanAllowing([]byte("host mini"), []string{"gpt-5.4-mini"}, "mini"); len(hits) != 1 {
+		t.Fatalf("literal outside allowed token not flagged: %v", hits)
+	}
+}
+
+func TestRecorderElideBlobs(t *testing.T) {
+	rec := NewRecorder("v", "m", "d", NewRedactor(), nil)
+	rec.ElideBlobs = true
+	set := &cursorpb.AgentServerMessage{Message: &cursorpb.AgentServerMessage_KvServerMessage{KvServerMessage: &cursorpb.KvServerMessage{
+		Id: 1, Message: &cursorpb.KvServerMessage_SetBlobArgs{SetBlobArgs: &cursorpb.SetBlobArgs{BlobId: []byte{9}, BlobData: []byte("harness prompt")}},
+	}}}
+	get := &cursorpb.AgentClientMessage{Message: &cursorpb.AgentClientMessage_KvClientMessage{KvClientMessage: &cursorpb.KvClientMessage{
+		Id: 2, Message: &cursorpb.KvClientMessage_GetBlobResult{GetBlobResult: &cursorpb.GetBlobResult{BlobData: []byte("abc")}},
+	}}}
+	if err := rec.Server(set); err != nil {
+		t.Fatal(err)
+	}
+	if err := rec.Client(get); err != nil {
+		t.Fatal(err)
+	}
+	srv, _ := rec.Fixture().Server()
+	cli, _ := rec.Fixture().Client()
+	if got := string(srv[0].GetKvServerMessage().GetSetBlobArgs().GetBlobData()); got != "[elided 14 bytes]" {
+		t.Fatalf("set blob = %q", got)
+	}
+	if got := string(cli[0].GetKvClientMessage().GetGetBlobResult().GetBlobData()); got != "[elided 3 bytes]" {
+		t.Fatalf("get blob = %q", got)
+	}
+	if string(set.GetKvServerMessage().GetSetBlobArgs().GetBlobData()) != "harness prompt" {
+		t.Fatal("recorder mutated the live message")
 	}
 }

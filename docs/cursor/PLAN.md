@@ -1,6 +1,6 @@
 # Plan: `cursor` upstream provider (native, Track A)
 
-Status: Phase 0 GO, Phase 1 tooling landed (2026-10-21). Next: Phase 2.
+Status: Phase 0 GO, Phase 1 tooling and Phase 2 protocol client landed (2026-10-21). Next: Phase 3 (auth) / Phase 4 (executor).
 
 ## Goal
 
@@ -74,6 +74,12 @@ Design from `SPIKE.md` ("Recommendation"); replay through `conversation_history`
 - Tools via `mcp_meta_tool_options` with full descriptors; answer `mcp_state_exec_args`; hide `get_mcp_tools`/`mcp_tool_call` updates from Claude Code.
 - Soft-deny every built-in exec (typed `rejected`/`error`, `stream_close` for `shell_stream`), log the type name at warn level.
 - Stream events → Claude SSE events (text, thinking, `tool_use`, usage from `turn_ended`, stop reason).
+
+As built (recorded fixtures, `MAINTENANCE.md`): `helps/cursor_wire.go` (transport), `cursor_claude.go` (request mapping, transcript), `cursor_session.go` (store), `cursor_run.go` (live Run: KV, MCP state, soft-deny by reflection), `cursor_client.go` (`CursorClient.Stream`, Claude events). Differences from the plan above:
+- Cursor dispatches the calls of one model step one at a time: the next `mcp_args` arrives only after the previous `mcp_result` (composer, gpt-5.4-mini, claude-sonnet-5). So a response carries one `tool_use` and ends with `tool_use` as soon as one is pending; `tool_requests_listed` counts the whole step and is not used.
+- State is keyed by the caller's key plus a hash of the first message, so Claude Code side requests and subagents sharing a session id do not disturb a held Run.
+- Thinking deltas become thinking blocks only when the request enables thinking; no signature is emitted.
+- A tool-use response reports output tokens from `token_delta`; input/cache usage only arrives with `turn_ended` (cumulative over the Run) and goes on the final response, whose output is net of what earlier responses of the Run reported.
 
 ## Phase 3: auth (`internal/auth/cursor`, `sdk/auth/cursor.go`, `--cursor-login`)
 

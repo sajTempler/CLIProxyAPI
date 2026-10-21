@@ -47,14 +47,14 @@ var roots = []string{
 const execServerMessage = "agent.v1.ExecServerMessage"
 
 // used lists the messages the provider reads or writes, each with the fields
-// it relies on (seeded from the Phase 0 spike, docs/cursor/SPIKE.md). --check
+// it relies on (the Phase 2 wire client in internal/runtime/executor/helps/cursor_*.go). --check
 // fails when a used message disappears, when any field of a used message is
 // renumbered or retyped, or when a listed field is removed. Removing an
 // unlisted field is reported but not fatal (Cursor prunes fields often).
 // Extend this when the provider starts using more of the protocol.
 var used = map[string][]string{
 	// Run envelope and request.
-	"agent.v1.AgentClientMessage": {"run_request", "exec_client_message", "exec_client_control_message", "kv_client_message", "conversation_action", "client_heartbeat"},
+	"agent.v1.AgentClientMessage": {"run_request", "exec_client_message", "exec_client_control_message", "kv_client_message", "conversation_action", "client_heartbeat", "interaction_response"},
 	"agent.v1.AgentServerMessage": {"interaction_update", "exec_server_message", "conversation_checkpoint_update", "kv_server_message", "interaction_query"},
 	"agent.v1.AgentRunRequest":    {"conversation_state", "action", "requested_model", "mcp_tools", "conversation_id", "conversation_group_id", "run_id"},
 	"agent.v1.ConversationAction": {"user_message_action", "resume_action", "cancel_action"},
@@ -62,41 +62,52 @@ var used = map[string][]string{
 	"agent.v1.UserMessage":        {"text", "message_id", "mode"},
 	"agent.v1.ResumeAction":       {"request_context"},
 	"agent.v1.CancelAction":       {"reason"},
-	"agent.v1.RequestedModel":     {"model_id", "max_mode", "parameters"},
+	"agent.v1.RequestedModel":     {"model_id", "max_mode"},
+	"agent.v1.McpTools":           {"mcp_tools"},
 	// Checkpoint bytes are stored and sent back opaquely.
 	"agent.v1.ConversationStateStructure": nil,
 	"agent.v1.ClientHeartbeat":            nil,
 	// Request context: rules (system prompt), env, MCP tool advertising.
-	"agent.v1.RequestContext":     {"rules", "env", "mcp_meta_tool_options", "web_search_enabled", "web_fetch_enabled"},
-	"agent.v1.RequestContextEnv":  {"os_version", "workspace_paths", "shell", "time_zone", "project_folder", "process_working_directory"},
-	"agent.v1.CursorRule":         {"full_path", "content", "type"},
-	"agent.v1.CursorRuleType":     {"global"},
-	"agent.v1.McpMetaToolOptions": {"enabled", "mcp_descriptors"},
-	"agent.v1.McpDescriptor":      {"server_name", "server_identifier", "tools"},
-	"agent.v1.McpToolDescriptor":  {"tool_name", "description", "input_schema"},
-	"agent.v1.McpToolDefinition":  {"name", "description", "input_schema", "provider_identifier", "tool_name"},
-	// Exec round-trips (MCP calls, MCP state, request context, soft-deny).
-	"agent.v1.ExecServerMessage":        {"id", "exec_id", "mcp_args", "mcp_state_exec_args", "request_context_args"},
-	"agent.v1.ExecClientMessage":        {"id", "exec_id", "mcp_result", "mcp_state_exec_result", "request_context_result"},
+	"agent.v1.RequestContext": {"rules", "env", "mcp_meta_tool_options", "mcp_file_system_options", "web_search_enabled", "web_fetch_enabled",
+		"rules_info_complete", "env_info_complete", "repository_info_complete", "git_repo_info_complete", "mcp_info_complete",
+		"custom_subagents_info_complete", "mcp_file_system_info_complete"},
+	"agent.v1.RequestContextEnv":    {"workspace_paths", "process_working_directory"},
+	"agent.v1.McpFileSystemOptions": {"enabled", "workspace_project_dir"},
+	"agent.v1.CursorRule":           {"full_path", "content", "type"},
+	"agent.v1.CursorRuleType":       {"global"},
+	"agent.v1.CursorRuleTypeGlobal": nil,
+	"agent.v1.McpMetaToolOptions":   {"enabled", "mcp_descriptors"},
+	"agent.v1.McpDescriptor":        {"server_name", "server_identifier", "tools"},
+	"agent.v1.McpToolDescriptor":    {"tool_name", "description", "input_schema"},
+	"agent.v1.McpToolDefinition":    {"name", "description", "input_schema", "provider_identifier", "tool_name"},
+	// Exec round-trips (MCP calls, MCP state, request context). Built-in execs
+	// are soft-denied by reflection (foo_args -> foo_result's rejected/error
+	// variant), so only the irregular shell_stream pair is listed.
+	"agent.v1.ExecServerMessage":        {"id", "exec_id", "mcp_args", "mcp_state_exec_args", "request_context_args", "shell_stream_args"},
+	"agent.v1.ExecClientMessage":        {"id", "exec_id", "mcp_result", "mcp_state_exec_result", "request_context_result", "shell_stream"},
 	"agent.v1.ExecClientControlMessage": {"stream_close"},
-	"agent.v1.McpArgs":                  {"name", "args", "tool_call_id", "provider_identifier", "tool_name"},
-	"agent.v1.McpResult":                {"success", "error"},
+	"agent.v1.ExecClientStreamClose":    {"id"},
+	"agent.v1.McpArgs":                  {"name", "args", "tool_call_id", "tool_name"},
+	"agent.v1.McpResult":                {"success"},
 	"agent.v1.McpSuccess":               {"content", "is_error"},
 	"agent.v1.McpToolResultContentItem": {"text"},
 	"agent.v1.McpTextContent":           {"text"},
 	"agent.v1.McpStateExecArgs":         nil,
 	"agent.v1.McpStateExecResult":       {"success"},
+	"agent.v1.McpStateSuccess":          {"servers"},
+	"agent.v1.McpStateServer":           {"server_name", "server_identifier", "tools"},
 	"agent.v1.RequestContextArgs":       nil,
 	"agent.v1.RequestContextResult":     {"success"},
+	"agent.v1.RequestContextSuccess":    {"request_context"},
 	// Streamed updates.
-	"agent.v1.InteractionUpdate":     {"text_delta", "thinking_delta", "tool_call_started", "turn_ended", "heartbeat"},
-	"agent.v1.TextDeltaUpdate":       {"text"},
-	"agent.v1.ThinkingDeltaUpdate":   {"text"},
-	"agent.v1.ToolCallStartedUpdate": {"call_id", "tool_call"},
-	"agent.v1.ToolCall":              {"mcp_tool_call"},
-	"agent.v1.TurnEndedUpdate":       {"input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens"},
-	"agent.v1.InteractionQuery":      {"id"},
-	"agent.v1.InteractionResponse":   {"id"},
+	"agent.v1.InteractionUpdate":       {"text_delta", "thinking_delta", "thinking_completed", "token_delta", "turn_ended"},
+	"agent.v1.TextDeltaUpdate":         {"text"},
+	"agent.v1.ThinkingDeltaUpdate":     {"text"},
+	"agent.v1.ThinkingCompletedUpdate": nil,
+	"agent.v1.TokenDeltaUpdate":        {"tokens"},
+	"agent.v1.TurnEndedUpdate":         {"input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"},
+	"agent.v1.InteractionQuery":        {"id"},
+	"agent.v1.InteractionResponse":     {"id"},
 	// KV blob store.
 	"agent.v1.KvServerMessage": {"id", "get_blob_args", "set_blob_args"},
 	"agent.v1.KvClientMessage": {"id", "get_blob_result", "set_blob_result"},
@@ -110,6 +121,7 @@ var used = map[string][]string{
 	"agent.v1.ModelDetails":               {"model_id", "display_name"},
 	"aiserver.v1.GetServerConfigRequest":  nil,
 	"aiserver.v1.GetServerConfigResponse": {"agent_url_config"},
+	"aiserver.v1.AgentUrlConfig":          {"agent_url", "agentn_url"},
 }
 
 func usedMessages() []string { return sortedKeys(used) }

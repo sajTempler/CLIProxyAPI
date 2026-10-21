@@ -61,3 +61,27 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
   - Live: import OK (Team account, JWT exp 2026-12-19, no API key in the keychain, so it can't be refreshed). Browser login prints the URL and live `auth/poll` stays pending (404) for 2 min without errors; the approval step needs a human and was not run. A fake API key gets 401 from `exchange_user_api_key`. `GetMe` returns 200 with `email`.
   - Gate: gofmt clean (pre-existing `pluginhost/host.go` excepted); build OK; tests green in auth/cursor, sdk/auth, sdk/cliproxy, internal/api/..., tui, cmd.
   - Next: Phase 4 executor `Refresh` delegates to `CursorAuth.Refresh`. Usage tracking implementation once `feat/quota-routing` is merged.
+- 2026-10-21, Phase 2 protocol client: landed (resumed from a killed agent's uncommitted `cursor_wire.go` draft; the transport was kept nearly as is). Live: 17 Runs of the 30 budget, one at a time, agent 2026.10.19-6bbf2c4.
+  - `956fdf44`: fixture `Recorder.ElideBlobs` (KV blobs hold Cursor's harness prompt) and `Redactor.Allow`/`ScanAllowing` (the host is called `mini`, which rewrote `gpt-5.4-mini`).
+  - `051cbed9`: `helps/cursor_wire.go`, `cursor_claude.go`, `cursor_session.go`, `cursor_run.go`, `cursor_client.go`; `used` map updated, `cursor_proto_sync --check` exit 0.
+  - `ad8370f9`: 9 recorded fixtures replace the 2 reconstructed ones; replay-transport golden tests; `cursorlive`-tagged recording harness (`MAINTENANCE.md` → Re-recording).
+  - `15698026`: per-response output tokens sum to the Run's `turn_ended`.
+  - Findings:
+    - Multi-tool: models generate parallel calls in one step, but Cursor dispatches them one at a time (next `mcp_args` only after the previous `mcp_result`) on composer-2.5, gpt-5.4-mini and claude-sonnet-5-low. Claude Code gets one `tool_use` per response.
+    - Thinking: composer and gpt stream `thinking_delta`; sonnet-5-low did not. Surfaced only when the request enables thinking, without signatures.
+    - Usage: real numbers in `turn_ended` (input incl. cache, cache_read, cache_write on Anthropic models), cumulative per Run. Bare harness overhead is about 8.3k input tokens.
+    - Big prompt (~60k-char synthetic Claude Code-style rule): about 20k input tokens, first delta 1.4 s, total 3.3 s on composer-2.5. Full adherence: prefix, lowercase and end marker.
+    - Checkpoint new turn and `resume_action` after a lost Run both continue correctly. A held Run stayed open for 50 s+ with server heartbeats every ~10 s.
+    - `claude-haiku-4-5` is not in `agent models`, but it worked. One `resource_exhausted` was transient.
+    - A deadlock bug (waiting for `tool_requests_listed` counts) hung 3 early Runs. It was fixed before recording.
+  - Gate: gofmt clean (except pre-existing `internal/pluginhost/host.go`), `go build ./...`, `go test -race ./internal/runtime/executor/helps/...`, `./cmd/cursor_proto_sync`, `./cmd/cursor_canary` green.
+  - Open for Phase 4:
+    - Pass `ConversationKey` (Claude Code session id).
+    - Map `CursorStatusError` to an HTTP status: `unauthenticated` → 401, `resource_exhausted` → 429 (retryable). Errors after output become a Claude `error` event.
+    - Call `Sweep` periodically and start `StartCursorVersionUpdater`.
+    - Use a proxy-aware HTTP/2 client with no timeouts.
+    - Apply payload rules to the Claude body before `Stream`, with a regression test.
+    - `CountTokens` estimate; models from `GetUsableModels`.
+    - Images are dropped (`[image omitted]`).
+    - Not tested live: new user text while a Run is held (`cancel_action` path) and holds lasting minutes.
+    - Thinking signatures are left for Phase 6.
