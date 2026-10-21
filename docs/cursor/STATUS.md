@@ -35,3 +35,21 @@ what changed (commit SHAs), what's next, blockers. Newest at the bottom.
   - `7f7484b1`: `scripts/cursor/` launchd watch + daily plists and `maintenance.sh`. Committed, NOT installed.
   - Gate: gofmt clean except pre-existing `internal/pluginhost/host.go`. `go test ./...` green except pre-existing `internal/client/codex/live` (TestPionMediaRelayBridgesAudioAndDataChannel) and `internal/discovery` (TestAdvertiserAndBrowser_Integration); both also fail at `58dc462a`.
   - Next: install the plists after review; Phase 2 wire client (feed a `Recorder` to replace the reconstructed fixtures).
+- 2026-10-21, Cursor usage tracking (branch `feat/cursor-usage` = `feat/quota-routing` + `feat/cursor-auth@a7d41a21`):
+  - `c7caa59f`: endpoint JSON contract fixed in `USAGE-TRACKING.md` section 5 (field names, units, nulls). Two section 3 corrections: the default interval is 15 min, not opt-in (only cursor auth files are polled); and `GetHardLimit` is skipped only for team accounts with `individualLimit`, because for personal accounts the CLI lets the hard limit override it.
+  - `792481c3`: changes by package:
+    - `internal/auth/cursor/usage.go`: response types and `MapUsage`, which mirrors the CLI's `usage-data.ts`, including the on-demand `u()` rule. Table-tested against the live JSON.
+    - `sdk/cliproxy/auth/cursor_quota.go`: `CursorQuotaTracker`, attached to the Manager like the Claude tracker and forgotten on `Remove`.
+    - `internal/cursorquota`: the poller, which is display only. It has a 15 min ±10 % jitter and a controllable clock, and backs off on 429/403 for Retry-After or 5 min, capped at 1 h, never sooner than the regular interval. It reports `unauthorized` on 401, and `token_expired`/`no_access_token` without making a call. It runs single-flight per account, and `Stop` cancels in-flight polls. It refreshes `GetPlanInfo` every 24 h and `GetHardLimit` every 6 h, keeping the last good value. It sets no client timeout, never logs or rewrites tokens, and never refreshes them.
+    - Config: `routing.cursor-quota.refresh-interval` (`""` = 15m, `"0"` = off).
+    - Endpoints: `GET /v8/management/quota/cursor` and `POST /v8/management/quota/cursor/refresh`.
+    - Claude: its routes are unchanged; only the shared `refreshQuotaAll` helper was generalized.
+  - Tests:
+    - An httptest fake DashboardService (Connect unary JSON, per bearer, headers asserted).
+    - Handler contract tests (key sets, nulls, units) and route and auth registration.
+    - A service lifecycle test.
+    - `-race` is clean.
+  - Live auth file:
+    - The earlier `--cursor-import-agent` live run left no auth file anywhere: not in `~/.cli-proxy-api`, the worktrees' `auths/` or `temp/`, or `/tmp`.
+    - Re-ran the import with this branch and the live config. It wrote `~/.cli-proxy-api/cursor-<email>-<hash>.json` (JWT exp 2026-12-19, no API key, so not refreshable). `config.yaml` was unchanged.
+    - A proxy without a cursor executor loads the file with no warnings or errors and lists 0 models in `/v1/models`. Checked on a :8318 test instance and in the live logs. `ProviderRefreshLead("cursor")` is nil on this branch, so there is no refresh attempt.
